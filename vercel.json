@@ -1,0 +1,19 @@
+{
+  "buildCommand": "pnpm build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "installCommand": "pnpm install",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@mizual-api-url"
+  },
+  "build": {
+    "env": {
+      "NEXT_TELEMETRY_DISABLED": "1"
+    }
+  },
+  "functions": {
+    "app/**/*.tsx": {
+      "runtime": "nodejs18.x"
+    }
+  }
+}
