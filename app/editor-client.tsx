@@ -83,7 +83,8 @@ export default function AIImageEditor() {
     setIsProcessing(true);
     setCurrentView("upload");
 
-    const response = await fetch("http://localhost:8000/edit-image/", {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const response = await fetch(`${apiUrl}/edit-image/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, image: uploadedImage }),
@@ -96,7 +97,8 @@ export default function AIImageEditor() {
   useEffect(() => {
     if (editId) {
       const poll = async () => {
-        const pollResponse = await fetch(`http://localhost:8000/edit/${editId}`);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const pollResponse = await fetch(`${apiUrl}/edit/${editId}`);
         const pollData = await pollResponse.json();
 
         if (pollData.status === 'completed') {
