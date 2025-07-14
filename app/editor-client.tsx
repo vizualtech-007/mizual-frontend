@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 
 type ViewState = "home" | "upload" | "output"
 
+
 export default function AIImageEditor() {
   const [currentView, setCurrentView] = useState<ViewState>("home")
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
