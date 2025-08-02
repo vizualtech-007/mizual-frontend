@@ -4,7 +4,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Mizual',
   description: 'Mizual',
-  generator: 'Mizual,
+  generator: 'Mizual',
 }
 
 export default function RootLayout({
