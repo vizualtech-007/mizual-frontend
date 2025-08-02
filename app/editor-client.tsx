@@ -200,7 +200,7 @@ export default function AIImageEditor() {
                   ✨ Instantly Edit Your Photos with AI
                 </h1>
                 <p className="text-sm sm:text-base text-gray-600">
-                  Describe your edit: “Blur background”, “Add glasses”, “Fix lighting
+
                 </p>
               </div>
 
@@ -315,7 +315,7 @@ export default function AIImageEditor() {
                 <textarea
                   ref={textareaRef}
                   value={prompt}
-                  placeholder="Describe what you would like to edit?"
+                  placeholder="Describe your edit: “Blur background”, “Add glasses”, “Fix lighting"
                   rows={1}
                   className="w-full resize-none overflow-auto max-h-[45vh] min-h-12 text-base lg:text-xl px-4 pr-14 py-2 bg-transparent leading-none focus:outline-none text-[#1C1C1E]"
                   onChange={(e) => setPrompt(e.target.value)}
