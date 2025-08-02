@@ -1,4 +1,4 @@
-# Simple development Dockerfile for Next.js
+# Production Dockerfile for Next.js
 FROM node:18-alpine
 
 WORKDIR /app
@@ -7,13 +7,19 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci --only=production
 
 # Copy source code
 COPY . .
 
+# Build the application
+RUN npm run build
+
 # Expose port
 EXPOSE 3000
 
-# Start development server
-CMD ["npm", "run", "dev"]
+# Set production environment
+ENV NODE_ENV=production
+
+# Start production server
+CMD ["npm", "start"]

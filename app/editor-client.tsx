@@ -197,10 +197,10 @@ export default function AIImageEditor() {
             <div className="h-[50%] sm:h-[55%] md:h-[55%] lg:h-[45%] w-full mx-auto pt-2 px-2 my-6">
               <div className="text-center mb-6">
                 <h1 className="text-3xl sm:text-4xl sm:text-4xl lg:text-4xl font-bold text-[#1C1C1E] mb-2">
-                  Transform Your Images with AI
+                  ✨ Instantly Edit Your Photos with AI
                 </h1>
                 <p className="text-sm sm:text-base text-gray-600">
-                  Upload an image and describe how you'd like to edit it
+                  Describe your edit: “Blur background”, “Add glasses”, “Fix lighting
                 </p>
               </div>
 
@@ -216,8 +216,7 @@ export default function AIImageEditor() {
                     <Upload className="w-6 h-6 sm:w-8 text-[#4F46E5]" />
                   </div>
                   <div>
-                    <p className="text-sm sm:text-base font-medium text-[#1C1C1E] mb-1">Drag and drop an image</p>
-                    <p className="text-xs sm:text-sm text-gray-500">or click to browse</p>
+                    <p className="text-sm sm:text-base font-medium text-[#1C1C1E] mb-1">Choose a photo to get started</p>
                   </div>
                 </div>
               </div>
