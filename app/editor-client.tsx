@@ -26,26 +26,26 @@ export default function AIImageEditor() {
     {
       title: "Face Retouching",
       prompt: "Subtle skin smoothing and eye brightening, keeping a realistic look",
-      beforeImage: "https://mesual-test.s3.us-east-1.amazonaws.com/before2.jpeg",
-      afterImage: "https://mesual-test.s3.us-east-1.amazonaws.com/after2.png",
+      beforeImage: "/images/mizual-acne.webp",
+      afterImage: "/images/mizual-acne-removal.jpeg",
     },
     {
       title: "Remove Anything",
       prompt: "Remove the women on the left",
-      beforeImage: "https://mesual-test.s3.us-east-1.amazonaws.com/before1.jpeg",
-      afterImage: "https://mesual-test.s3.us-east-1.amazonaws.com/after1.png",
+      beforeImage: "/images/mizual-remove.jpeg",
+      afterImage: "/images/mizual-remove-anything.jpeg",
     },
     {
-      title: "LinkedIn Headshot",
+      title: "Professional Headshot",
       prompt: "Turn this into a clean, professional LinkedIn headshot",
-      beforeImage: "/placeholder.svg?height=150&width=150",
-      afterImage: "/placeholder.svg?height=150&width=150",
+      beforeImage: "/images/mizual-headshot.jpg",
+      afterImage: "/images/mizual-headshot-created.jpeg",
     },
     {
-      title: "Poster Creation",
+      title: "Scene Replacement",
       prompt: "Make this look like a movie poster with dramatic lighting and bold text",
-      beforeImage: "/placeholder.svg?height=150&width=150",
-      afterImage: "/placeholder.svg?height=150&width=150",
+      beforeImage: "/images/mizual-background.jpeg",
+      afterImage: "/images/mizual-background-change.jpeg",
     },
   ]
 
