@@ -85,11 +85,14 @@ export default function AIImageEditor() {
     setCurrentView("upload");
 
     // Use Next.js runtime config for browser access
-    const apiUrl = typeof window !== 'undefined' 
+    let apiUrl = typeof window !== 'undefined' 
       ? window.location.hostname.includes('git-dev') 
         ? 'https://mizual-backend-dev.onrender.com'
         : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    
+    // Remove trailing slash to avoid double slashes
+    apiUrl = apiUrl.replace(/\/$/, '');
     console.log("API URL being used:", apiUrl); // Debug log
     const response = await fetch(`${apiUrl}/edit-image/`, {
       method: "POST",
@@ -105,11 +108,14 @@ export default function AIImageEditor() {
     if (editId) {
       const poll = async () => {
         // Use Next.js runtime config for browser access
-        const apiUrl = typeof window !== 'undefined' 
+        let apiUrl = typeof window !== 'undefined' 
           ? window.location.hostname.includes('git-dev') 
             ? 'https://mizual-backend-dev.onrender.com'
             : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
           : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        
+        // Remove trailing slash to avoid double slashes
+        apiUrl = apiUrl.replace(/\/$/, '');
         console.log("Polling API URL:", apiUrl); // Debug log
         const pollResponse = await fetch(`${apiUrl}/edit/${editId}`);
         const pollData = await pollResponse.json();
