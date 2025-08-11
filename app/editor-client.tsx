@@ -173,6 +173,25 @@ export default function AIImageEditor() {
     }
   }, [prompt])
 
+  // Keyboard navigation for image variants
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle arrow keys when in output view and not typing in textarea
+      if (currentView === "output" && document.activeElement?.tagName !== 'TEXTAREA') {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          prevVariant()
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          nextVariant()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [currentView, generatedVariants.length])
+
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const scroll = (direction: "left" | "right") => {
@@ -331,10 +350,18 @@ export default function AIImageEditor() {
                 <textarea
                   ref={textareaRef}
                   value={prompt}
-                  placeholder="Describe your edit: “Blur background”, “Add glasses”, “Fix lighting"
+                  placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
                   rows={1}
                   className="w-full resize-none overflow-auto max-h-[45vh] min-h-12 text-base lg:text-xl px-4 pr-14 py-2 bg-transparent leading-none focus:outline-none text-[#1C1C1E]"
                   onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (prompt.trim() && !isProcessing) {
+                        handleSubmitPrompt()
+                      }
+                    }
+                  }}
                 />
 
                 {/* Embedded Right Arrow Button */}
