@@ -31,7 +31,7 @@ export default function AIImageEditor() {
     },
     {
       title: "Remove Anything",
-      prompt: "Remove the women on the left",
+      prompt: "Remove the person playing saxophone, keeping only the person playing drums.",
       beforeImage: "/images/mizual-remove.jpeg",
       afterImage: "/images/mizual-remove-anything.jpeg",
     },
