@@ -93,7 +93,6 @@ export default function AIImageEditor() {
     
     // Remove trailing slash to avoid double slashes
     apiUrl = apiUrl.replace(/\/$/, '');
-    console.log("API URL being used:", apiUrl); // Debug log
     const response = await fetch(`${apiUrl}/edit-image/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -116,7 +115,6 @@ export default function AIImageEditor() {
         
         // Remove trailing slash to avoid double slashes
         apiUrl = apiUrl.replace(/\/$/, '');
-        console.log("Polling API URL:", apiUrl); // Debug log
         const pollResponse = await fetch(`${apiUrl}/edit/${editId}`);
         const pollData = await pollResponse.json();
 
