@@ -21,6 +21,32 @@ export default function AIImageEditor() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [generatedVariants, setGeneratedVariants] = useState<string[]>([])
   const [editId, setEditId] = useState<string | null>(null);
+  const [baseImageForEdit, setBaseImageForEdit] = useState<string | null>(null);
+  const isSubmittingRef = useRef(false);
+
+  const ensureDataUrl = async (src: string): Promise<string> => {
+    if (src.startsWith("data:")) return src;
+    const res = await fetch(src, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch image for conversion");
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const parseRetryAfter = (header: string | null): number => {
+    if (!header) return 0;
+    const seconds = Number.parseInt(header, 10);
+    if (!Number.isNaN(seconds)) return seconds * 1000;
+    const dateMs = Date.parse(header);
+    if (!Number.isNaN(dateMs)) return Math.max(0, dateMs - Date.now());
+    return 0;
+  };
 
   const useCases = [
     {
@@ -79,10 +105,17 @@ export default function AIImageEditor() {
   }
 
   const handleSubmitPrompt = async () => {
-    if (!prompt.trim() || !uploadedImage) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    const sourceImage =
+      currentView === "output" && generatedVariants.length > 0
+        ? generatedVariants[currentVariant]
+        : uploadedImage;
+
+    if (!prompt.trim() || !sourceImage) return;
 
     setIsProcessing(true);
-    setCurrentView("upload");
+    setBaseImageForEdit(sourceImage);
 
     // Use Next.js runtime config for browser access
     let apiUrl = typeof window !== 'undefined' 
@@ -93,14 +126,40 @@ export default function AIImageEditor() {
     
     // Remove trailing slash to avoid double slashes
     apiUrl = apiUrl.replace(/\/$/, '');
-    const response = await fetch(`${apiUrl}/edit-image/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, image: uploadedImage }),
-    });
+    let imagePayload: string;
+    try {
+      imagePayload = await ensureDataUrl(sourceImage);
+    } catch (e) {
+      setIsProcessing(false);
+      return;
+    }
+
+    let attempt = 0;
+    let response: Response | null = null;
+    while (attempt < 3) {
+      response = await fetch(`${apiUrl}/edit-image/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, image: imagePayload }),
+      });
+      if (response.status === 429) {
+        const retryAfterMs = parseRetryAfter(response.headers.get("retry-after")) || (1500 * Math.pow(2, attempt));
+        await wait(retryAfterMs);
+        attempt += 1;
+        continue;
+      }
+      break;
+    }
+
+    if (!response || !response.ok) {
+      setIsProcessing(false);
+      isSubmittingRef.current = false;
+      return;
+    }
 
     const data = await response.json();
     setEditId(data.edit_id);
+    isSubmittingRef.current = false;
   }
 
   useEffect(() => {
@@ -119,14 +178,20 @@ export default function AIImageEditor() {
         const pollData = await pollResponse.json();
 
         if (pollData.status === 'completed') {
-          setGeneratedVariants([uploadedImage, pollData.edited_image_url]);
-          setCurrentVariant(1); // Focus on the edited image variant
+          const base = baseImageForEdit || uploadedImage;
+          const newUrl = pollData.edited_image_url as string;
+          const nextVariants = generatedVariants.length === 0
+            ? [base as string, newUrl]
+            : [...generatedVariants, newUrl];
+          setGeneratedVariants(nextVariants);
+          setCurrentVariant(nextVariants.length - 1); // Focus on the newest image
           setIsProcessing(false);
           setCurrentView("output");
           setEditId(null); // Clear editId to stop polling
+          setUploadedImage(pollData.edited_image_url);
         } else if (pollData.status === 'failed') {
           setIsProcessing(false);
-          setCurrentView("input");
+          setCurrentView("upload");
           setEditId(null);
         } else {
           setTimeout(poll, 1000);
@@ -392,7 +457,7 @@ export default function AIImageEditor() {
 
             {/* Image with Navigation  w-full h-[calc(100%-3rem)]  */}
             <div
-              className="relative w-full h-full flex items-center justify-center min-h-0"
+              className="relative w-full h-[calc(100%-12rem)] flex items-center justify-center min-h-0"
               onTouchStart={(e) => {
                 const touch = e.touches[0]
                 e.currentTarget.dataset.startX = touch.clientX.toString()
@@ -431,6 +496,15 @@ export default function AIImageEditor() {
                   onClick={() => setIsFullscreen(true)}
                 />
               </div>
+              {/* Floating Download Button */}
+              <Button
+                onClick={handleDownload}
+                size="icon"
+                className="absolute bottom-4 right-4 w-12 h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
+                title="Download Image"
+              >
+                <Download className="w-5 h-5" />
+              </Button>
               {/* Right Navigation Button */}
               <Button
                 variant="ghost"
@@ -442,30 +516,63 @@ export default function AIImageEditor() {
               </Button>
             </div>
 
-            {/* Progress Indicators and Download Button */}
-            <div className="relative z-10 h-14 w-full max-w-screen-md flex justify-between items-center">
-              <div className="flex gap-2 w-full pr-12 justify-center">
-                {generatedVariants.map((_, index) => (
+            {/* Thumbnail Navigation */}
+            <div className="relative z-10 w-full max-w-screen-md flex justify-center items-center py-4 mb-6">
+              <div className="flex gap-2 sm:gap-3 w-full justify-center">
+                {generatedVariants.map((variant, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentVariant(index)}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      index === currentVariant ? "bg-[#4F46E5] w-8" : "bg-[#D1D5DB] hover:bg-gray-400 w-2"
+                    className={`relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${
+                      index === currentVariant 
+                        ? "border-[#4F46E5] shadow-lg" 
+                        : "border-[#D1D5DB] hover:border-gray-400"
                     }`}
-                  />
+                  >
+                    <Image
+                      src={variant}
+                      alt={`Variant ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
                 ))}
               </div>
-
-              {/* Download Button */}
-              <Button
-                onClick={handleDownload}
-                size="icon"
-                className="absolute right-0 w-10 h-10 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                title="Download Image"
-              >
-                <Download className="w-4 h-4" />
-              </Button>
             </div>
+
+              {/* Prompt Input - same placement as upload view */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-screen-md px-4 z-10">
+                <div className="flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
+                  <textarea
+                    ref={textareaRef}
+                    value={prompt}
+                    placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
+                    rows={1}
+                    className="w-full resize-none overflow-auto max-h-[45vh] min-h-12 text-base lg:text-xl px-4 pr-14 py-2 bg-transparent leading-none focus:outline-none text-[#1C1C1E]"
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        if (prompt.trim() && !isProcessing) {
+                          handleSubmitPrompt()
+                        }
+                      }
+                    }}
+                  />
+
+                  {/* Embedded Right Arrow Button */}
+                  <button
+                    onClick={handleSubmitPrompt}
+                    disabled={!prompt.trim() || isProcessing}
+                    className="absolute absolute top-1/2 right-4 -translate-y-1/2 mr-1 sm:mr-2 w-10 h-10 mr-1 sm:mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center focus:outline-none focus:ring-0"
+                  >
+                    {isProcessing ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <ChevronRight className="w-6 h-6" />
+                    )}
+                  </button>
+                </div>
+              </div>
           </div>
         )}
 
