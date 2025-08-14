@@ -22,6 +22,7 @@ export default function AIImageEditor() {
   const [generatedVariants, setGeneratedVariants] = useState<string[]>([])
   const [editId, setEditId] = useState<string | null>(null);
   const [baseImageForEdit, setBaseImageForEdit] = useState<string | null>(null);
+  const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
 
   const ensureDataUrl = async (src: string): Promise<string> => {
@@ -134,13 +135,21 @@ export default function AIImageEditor() {
       return;
     }
 
+    // Determine if this is a chain edit
+    const isChainEdit = currentView === "output" && generatedVariants.length > 0;
+    const parentUuid = isChainEdit ? currentEditUuid : undefined;
+
     let attempt = 0;
     let response: Response | null = null;
     while (attempt < 3) {
       response = await fetch(`${apiUrl}/edit-image/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, image: imagePayload }),
+        body: JSON.stringify({ 
+          prompt, 
+          image: imagePayload,
+          parent_edit_uuid: parentUuid 
+        }),
       });
       if (response.status === 429) {
         const retryAfterMs = parseRetryAfter(response.headers.get("retry-after")) || (1500 * Math.pow(2, attempt));
@@ -185,6 +194,7 @@ export default function AIImageEditor() {
             : [...generatedVariants, newUrl];
           setGeneratedVariants(nextVariants);
           setCurrentVariant(nextVariants.length - 1); // Focus on the newest image
+          setCurrentEditUuid(editId); // Track edit UUID for chaining
           setIsProcessing(false);
           setCurrentView("output");
           setEditId(null); // Clear editId to stop polling
