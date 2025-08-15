@@ -24,6 +24,23 @@ export default function AIImageEditor() {
   const [baseImageForEdit, setBaseImageForEdit] = useState<string | null>(null);
   const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const [processingStage, setProcessingStage] = useState<string>("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Toast auto-hide functionality
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 5000); // Hide after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  // Show toast message
+  const showToast = (message: string) => {
+    setToastMessage(message);
+  };
 
   const ensureDataUrl = async (src: string): Promise<string> => {
     if (src.startsWith("data:")) return src;
@@ -181,10 +198,21 @@ export default function AIImageEditor() {
             : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
           : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         
-        // Remove trailing slash to avoid double slashes
-        apiUrl = apiUrl.replace(/\/$/, '');
-        const pollResponse = await fetch(`${apiUrl}/edit/${editId}`);
-        const pollData = await pollResponse.json();
+        try {
+          // Remove trailing slash to avoid double slashes
+          apiUrl = apiUrl.replace(/\/$/, '');
+          const pollResponse = await fetch(`${apiUrl}/edit/${editId}`);
+          
+          if (!pollResponse.ok) {
+            throw new Error(`HTTP ${pollResponse.status}: ${pollResponse.statusText}`);
+          }
+          
+          const pollData = await pollResponse.json();
+
+        // Update processing stage for debugging
+        if (pollData.processing_stage) {
+          setProcessingStage(pollData.processing_stage);
+        }
 
         if (pollData.status === 'completed') {
           const base = baseImageForEdit || uploadedImage;
@@ -196,15 +224,26 @@ export default function AIImageEditor() {
           setCurrentVariant(nextVariants.length - 1); // Focus on the newest image
           setCurrentEditUuid(editId); // Track edit UUID for chaining
           setIsProcessing(false);
+          setProcessingStage(""); // Clear stage
           setCurrentView("output");
           setEditId(null); // Clear editId to stop polling
           setUploadedImage(pollData.edited_image_url);
+          showToast("Image editing completed successfully!");
         } else if (pollData.status === 'failed') {
           setIsProcessing(false);
+          setProcessingStage(""); // Clear stage
           setCurrentView("upload");
           setEditId(null);
+          showToast(`Image editing failed. Please try again with a different prompt or image.`);
         } else {
           setTimeout(poll, 1000);
+        }
+        } catch (error) {
+          console.error('Polling error:', error);
+          setIsProcessing(false);
+          setProcessingStage(""); // Clear stage
+          setEditId(null);
+          showToast(`Network error while checking status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       };
       poll();
@@ -653,6 +692,35 @@ export default function AIImageEditor() {
           </div>
         )}
       </main>
+
+      {/* Processing Stage Debug Info */}
+      {isProcessing && processingStage && (
+        <div className="fixed bottom-4 left-4 z-40 bg-blue-100 border border-blue-200 rounded-lg shadow-lg p-3">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+            <p className="text-sm text-blue-800 font-medium">
+              Stage: {processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Message */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+          <div className="flex items-start">
+            <div className="flex-1">
+              <p className="text-sm text-gray-900">{toastMessage}</p>
+            </div>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="ml-3 text-gray-400 hover:text-gray-600 text-lg leading-none"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
