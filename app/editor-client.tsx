@@ -242,37 +242,33 @@ export default function AIImageEditor() {
           if (pollData.processing_stage) {
             setProcessingStage(pollData.processing_stage);
           }
-
-          if (pollData.status === 'completed') {
-            const base = baseImageForEdit || uploadedImage;
-            const newUrl = pollData.edited_image_url as string;
-            const nextVariants = generatedVariants.length === 0
-              ? [base as string, newUrl]
-              : [...generatedVariants, newUrl];
-            setGeneratedVariants(nextVariants);
-            setCurrentVariant(nextVariants.length - 1);
-            setCurrentEditUuid(editId);
-            setIsProcessing(false);
-            setProcessingStage("");
-            setCurrentView("output");
-            setEditId(null);
-            setUploadedImage(pollData.edited_image_url);
-            showToast("Image editing completed successfully!");
-          } else if (pollData.status === 'failed') {
-            setIsProcessing(false);
-            setProcessingStage("");
-            setCurrentView("upload");
-            setEditId(null);
-            showToast(`Image editing failed. Please try again with a different prompt or image.`);
-          } else {
-            setTimeout(poll, 1000);
-          }
+        if (pollData.status === 'completed') {
+          const base = baseImageForEdit || uploadedImage;
+          const newUrl = pollData.edited_image_url as string;
+          const nextVariants = generatedVariants.length === 0
+            ? [base as string, newUrl]
+            : [...generatedVariants, newUrl];
+          setGeneratedVariants(nextVariants);
+          setCurrentVariant(nextVariants.length - 1); // Focus on the newest image
+          setCurrentEditUuid(editId); // Track edit UUID for chaining
+          setIsProcessing(false);
+          setProcessingStage(""); // Clear stage
+          setCurrentView("output");
+          setEditId(null); // Clear editId to stop polling
+          setUploadedImage(pollData.edited_image_url);
+        } else if (pollData.status === 'failed') {
+          setIsProcessing(false);
+          setProcessingStage(""); // Clear stage
+          setCurrentView("upload");
+          setEditId(null);
+        } else {
+          setTimeout(poll, 1000);
+        }
         } catch (error) {
           console.error('Polling error:', error);
           setIsProcessing(false);
           setProcessingStage("");
           setEditId(null);
-          showToast(`Network error while checking status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       };
       poll();
