@@ -733,12 +733,27 @@ export default function AIImageEditor() {
       </main>
 
       {/* Processing Stage Info - Responsive */}
-      {isProcessing && processingStage && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-4 sm:right-auto sm:max-w-xs z-40 bg-blue-100 border border-blue-200 rounded-lg shadow-lg p-3 sm:p-3">
+      {(isProcessing || processingStage === "failed") && processingStage && (
+        <div className={`fixed bottom-4 left-4 right-4 sm:left-4 sm:right-auto sm:max-w-xs z-40 border rounded-lg shadow-lg p-3 sm:p-3 ${
+          processingStage === "failed" 
+            ? "bg-red-100 border-red-200" 
+            : "bg-blue-100 border-blue-200"
+        }`}>
           <div className="flex items-center justify-center sm:justify-start space-x-2">
-            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
-            <p className="text-xs sm:text-sm text-blue-800 font-medium text-center sm:text-left truncate">
-              {processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${
+              processingStage === "failed" 
+                ? "bg-red-500" 
+                : "bg-blue-500 animate-pulse"
+            }`}></div>
+            <p className={`text-xs sm:text-sm font-medium text-center sm:text-left truncate ${
+              processingStage === "failed" 
+                ? "text-red-800" 
+                : "text-blue-800"
+            }`}>
+              {processingStage === "failed" 
+                ? "Image editing failed. The AI service is currently unavailable. Please try again later."
+                : processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+              }
             </p>
           </div>
         </div>
