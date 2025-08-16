@@ -6,9 +6,17 @@ import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import { Upload, ArrowLeft, ChevronLeft, ChevronRight, Download, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 type ViewState = "home" | "upload" | "output"
-
+type LegalDocument = "Privacy Policy" | "Terms of Condition" | "Terms of Use"
 
 export default function AIImageEditor() {
   const [currentView, setCurrentView] = useState<ViewState>("home")
@@ -26,13 +34,19 @@ export default function AIImageEditor() {
   const isSubmittingRef = useRef(false);
   const [processingStage, setProcessingStage] = useState<string>("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [legalDoc, setLegalDoc] = useState<LegalDocument | null>(null);
+  const [isLegalDialogOpen, setIsLegalDialogOpen] = useState(false);
+  const [legalContent, setLegalContent] = useState("");
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+
+  
 
   // Toast auto-hide functionality
   useEffect(() => {
     if (toastMessage) {
       const timer = setTimeout(() => {
         setToastMessage(null);
-      }, 5000); // Hide after 5 seconds
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
@@ -135,14 +149,12 @@ export default function AIImageEditor() {
     setIsProcessing(true);
     setBaseImageForEdit(sourceImage);
 
-    // Use Next.js runtime config for browser access
-    let apiUrl = typeof window !== 'undefined' 
-      ? window.location.hostname.includes('git-dev') 
+    let apiUrl = typeof window !== 'undefined'
+      ? window.location.hostname.includes('git-dev')
         ? 'https://mizual-backend-dev.onrender.com'
         : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    
-    // Remove trailing slash to avoid double slashes
+
     apiUrl = apiUrl.replace(/\/$/, '');
     let imagePayload: string;
     try {
@@ -152,7 +164,6 @@ export default function AIImageEditor() {
       return;
     }
 
-    // Determine if this is a chain edit
     const isChainEdit = currentView === "output" && generatedVariants.length > 0;
     const parentUuid = isChainEdit ? currentEditUuid : undefined;
 
@@ -162,10 +173,10 @@ export default function AIImageEditor() {
       response = await fetch(`${apiUrl}/edit-image/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          prompt, 
+        body: JSON.stringify({
+          prompt,
           image: imagePayload,
-          parent_edit_uuid: parentUuid 
+          parent_edit_uuid: parentUuid
         }),
       });
       if (response.status === 429) {
@@ -191,57 +202,54 @@ export default function AIImageEditor() {
   useEffect(() => {
     if (editId) {
       const poll = async () => {
-        // Use Next.js runtime config for browser access
-        let apiUrl = typeof window !== 'undefined' 
-          ? window.location.hostname.includes('git-dev') 
+        let apiUrl = typeof window !== 'undefined'
+          ? window.location.hostname.includes('git-dev')
             ? 'https://mizual-backend-dev.onrender.com'
             : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
           : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        
+
         try {
-          // Remove trailing slash to avoid double slashes
           apiUrl = apiUrl.replace(/\/$/, '');
           const pollResponse = await fetch(`${apiUrl}/edit/${editId}`);
-          
+
           if (!pollResponse.ok) {
             throw new Error(`HTTP ${pollResponse.status}: ${pollResponse.statusText}`);
           }
-          
+
           const pollData = await pollResponse.json();
 
-        // Update processing stage for debugging
-        if (pollData.processing_stage) {
-          setProcessingStage(pollData.processing_stage);
-        }
+          if (pollData.processing_stage) {
+            setProcessingStage(pollData.processing_stage);
+          }
 
-        if (pollData.status === 'completed') {
-          const base = baseImageForEdit || uploadedImage;
-          const newUrl = pollData.edited_image_url as string;
-          const nextVariants = generatedVariants.length === 0
-            ? [base as string, newUrl]
-            : [...generatedVariants, newUrl];
-          setGeneratedVariants(nextVariants);
-          setCurrentVariant(nextVariants.length - 1); // Focus on the newest image
-          setCurrentEditUuid(editId); // Track edit UUID for chaining
-          setIsProcessing(false);
-          setProcessingStage(""); // Clear stage
-          setCurrentView("output");
-          setEditId(null); // Clear editId to stop polling
-          setUploadedImage(pollData.edited_image_url);
-          showToast("Image editing completed successfully!");
-        } else if (pollData.status === 'failed') {
-          setIsProcessing(false);
-          setProcessingStage(""); // Clear stage
-          setCurrentView("upload");
-          setEditId(null);
-          showToast(`Image editing failed. Please try again with a different prompt or image.`);
-        } else {
-          setTimeout(poll, 1000);
-        }
+          if (pollData.status === 'completed') {
+            const base = baseImageForEdit || uploadedImage;
+            const newUrl = pollData.edited_image_url as string;
+            const nextVariants = generatedVariants.length === 0
+              ? [base as string, newUrl]
+              : [...generatedVariants, newUrl];
+            setGeneratedVariants(nextVariants);
+            setCurrentVariant(nextVariants.length - 1);
+            setCurrentEditUuid(editId);
+            setIsProcessing(false);
+            setProcessingStage("");
+            setCurrentView("output");
+            setEditId(null);
+            setUploadedImage(pollData.edited_image_url);
+            showToast("Image editing completed successfully!");
+          } else if (pollData.status === 'failed') {
+            setIsProcessing(false);
+            setProcessingStage("");
+            setCurrentView("upload");
+            setEditId(null);
+            showToast(`Image editing failed. Please try again with a different prompt or image.`);
+          } else {
+            setTimeout(poll, 1000);
+          }
         } catch (error) {
           console.error('Polling error:', error);
           setIsProcessing(false);
-          setProcessingStage(""); // Clear stage
+          setProcessingStage("");
           setEditId(null);
           showToast(`Network error while checking status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -278,7 +286,6 @@ export default function AIImageEditor() {
     setEditId(null);
   }
 
-  // Resize textarea based on content
   useEffect(() => {
     const textarea = textareaRef.current
     if (textarea) {
@@ -287,10 +294,8 @@ export default function AIImageEditor() {
     }
   }, [prompt])
 
-  // Keyboard navigation for image variants
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle arrow keys when in output view and not typing in textarea
       if (currentView === "output" && document.activeElement?.tagName !== 'TEXTAREA') {
         if (e.key === 'ArrowLeft') {
           e.preventDefault()
@@ -306,167 +311,209 @@ export default function AIImageEditor() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [currentView, generatedVariants.length])
 
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  const scroll = (direction: "left" | "right") => {
-    if (scrollRef.current) {
-      const { clientWidth } = scrollRef.current
-      scrollRef.current.scrollBy({
-        left: direction === "left" ? -clientWidth * 0.9 : clientWidth * 0.9,
-        behavior: "smooth",
-      })
-    }
-  }
-
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#F8F9FA] flex flex-col">
-      {/* Header h-14 px fiexed height*/}
-      <header className="w-full h-16 px-6 py-4 flex items-center justify-between border-b border-[#D1D5DB] bg-white">
-        <div onClick={resetEditor} className="flex items-center gap-3 cursor-pointer">
-          <div className="w-8 h-8 bg-[#4F46E5] rounded-lg flex items-center justify-center">
+      {/* Header */}
+      <header className="w-full h-14 sm:h-16 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between border-b border-[#D1D5DB] bg-white flex-shrink-0">
+        <div onClick={resetEditor} className="flex items-center gap-2 sm:gap-3 cursor-pointer">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#4F46E5] rounded-lg flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="text-xl font-semibold text-[#1C1C1E]">Mizual</span>
+          <span className="text-lg sm:text-xl font-semibold text-[#1C1C1E]">Mizual</span>
         </div>
         {currentView === "output" && (
           <Button
             variant="ghost"
             onClick={resetEditor}
-            className="text-[#1C1C1E] hover:bg-gray-100 rounded-lg px-4 py-2"
+            className="text-[#1C1C1E] hover:bg-gray-100 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base"
           >
             New Edit
           </Button>
         )}
+        <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              className="text-[#1C1C1E] hover:bg-gray-100 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base"
+            >
+              Contact
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Contact Us</DialogTitle>
+              <DialogDescription>
+                You can reach us at contact@mizual.ai
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-y-auto">
         {currentView === "home" && (
-          <div className="flex-1 flex flex-col px-2 pb-4 sm:px-4">
-            <div className="h-[50%] sm:h-[55%] md:h-[55%] lg:h-[45%] w-full mx-auto pt-2 px-2 my-6">
-              <div className="text-center mb-6">
-                <h1 className="text-3xl sm:text-4xl sm:text-4xl lg:text-4xl font-bold text-[#1C1C1E] mb-2">
+          <div className="flex flex-col min-h-full">
+            {/* Hero Section */}
+            <div className="flex-grow flex flex-col justify-center px-4 sm:px-6 lg:px-8 pt-8 lg:pt-4">
+              <div className="text-center mb-6 sm:mb-8">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#1C1C1E] mb-2 sm:mb-3">
                   ✨ Instantly Edit Your Photos with AI
                 </h1>
-                <p className="text-sm sm:text-base text-gray-600">
-
-                </p>
               </div>
-
-              {/* Upload Area */}
               <div
-                className="max-w-2xl mx-auto border-2 border-dashed border-[#D1D5DB] rounded-2xl p-8 text-center bg-white shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group hover:border-[#4F46E5]"
+                className="w-full max-w-2xl mx-auto border-2 border-dashed border-[#D1D5DB] rounded-xl sm:rounded-2xl p-6 sm:p-8 lg:p-10 text-center bg-transparent transition-all duration-300 cursor-pointer group hover:border-[#4F46E5]"
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-[#4F46E5]/10 transition-colors">
-                    <Upload className="w-6 h-6 sm:w-8 text-[#4F46E5]" />
+                <div className="flex flex-col items-center gap-3 sm:gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-[#4F46E5]/10 transition-colors">
+                    <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-[#4F46E5]" />
                   </div>
                   <div>
-                    <p className="text-sm sm:text-base font-medium text-[#1C1C1E] mb-1">Choose a photo to get started</p>
+                    <p className="text-base sm:text-lg font-medium text-[#1C1C1E] mb-1">
+                      Choose a photo to get started
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                      Or drag and drop your image here
+                    </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Prompt Suggestions */}
+              <div className="text-center py-4 sm:py-6">
+                <p className="text-sm text-gray-500 mb-3">Or try one of these examples:</p>
+                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 px-4">
+                  {useCases.map((useCase, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setUploadedImage(useCase.beforeImage);
+                        setPrompt(useCase.prompt);
+                        setCurrentView("upload");
+                      }}
+                      className="px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs sm:text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                    >
+                      {useCase.title}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
 
-            <div className="relative h-[50%] sm:h-[45%] md:h-[45%] lg:h-[55%] px-4 sm:px-6 lg:px-10 overflow-y-auto">
-              <div
-                ref={scrollRef}
-                className="flex h-full items-center overflow-x-auto gap-4 scroll-smooth snap-x snap-mandatory scrollbar-hide"
-              >
-                {useCases.map((useCase, index) => (
-                  <div
-                    key={index}
-                    className="snap-start shrink-0 bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col items-center text-center group border border-[#D1D5DB] min-w-[90%] sm:min-w-[45%] lg:min-w-[40%] max-h-full"
-                  >
-                    <h3 className="text-lg sm:text-xl font-bold text-[#1C1C1E] mb-2">{useCase.title}</h3>
-                    {/* <p className="text-sm text-gray-600 mb-4 italic">"{useCase.prompt}"</p> */}
-                    <div className="flex gap-2 sm:gap-3 w-full justify-center">
-                      <div className="relative w-[50%] aspect-square rounded-xl overflow-hidden shadow-sm border border-[#D1D5DB] max-h-[120px] sm:max-h-[140px] md:max-h-[200px] lg:max-h-[200px]">
-                        <Image
-                          src={useCase.beforeImage || "/placeholder.svg"}
-                          alt={`${useCase.title} before`}
-                          layout="fill"
-                          objectFit="cover"
-                          className="group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <span className="absolute bottom-1 left-1 text-xs font-medium text-white bg-black/60 px-1.5 py-0.5 rounded-md">
-                          Before
-                        </span>
-                      </div>
-                      <div className="relative w-[50%] aspect-square rounded-xl overflow-hidden shadow-sm border border-[#D1D5DB] max-h-[120px] sm:max-h-[140px] md:max-h-[200px] lg:max-h-[200px]">
-                        <Image
-                          src={useCase.afterImage || "/placeholder.svg"}
-                          alt={`${useCase.title} after`}
-                          layout="fill"
-                          objectFit="cover"
-                          className="group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <span className="absolute bottom-1 left-1 text-xs font-medium text-white bg-black/60 px-1.5 py-0.5 rounded-md">
-                          After
-                        </span>
+            {/* Examples Section */}
+            <div className="w-full bg-transparent">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {useCases.map((useCase, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-xl p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-300 group border border-[#D1D5DB]"
+                    >
+                      <h3 className="text-sm sm:text-base font-bold text-[#1C1C1E] mb-2 sm:mb-3 text-center">
+                        {useCase.title}
+                      </h3>
+                      <div className="flex gap-2 sm:gap-3 w-full">
+                        <div className="relative flex-1 aspect-square rounded-lg overflow-hidden shadow-sm border border-[#D1D5DB]">
+                          <Image
+                            src={useCase.beforeImage || "/placeholder.svg"}
+                            alt={`${useCase.title} before`}
+                            layout="fill"
+                            objectFit="cover"
+                            className="group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <span className="absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded">
+                            Before
+                          </span>
+                        </div>
+                        <div className="relative flex-1 aspect-square rounded-lg overflow-hidden shadow-sm border border-[#D1D5DB]">
+                          <Image
+                            src={useCase.afterImage || "/placeholder.svg"}
+                            alt={`${useCase.title} after`}
+                            layout="fill"
+                            objectFit="cover"
+                            className="group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <span className="absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded">
+                            After
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-              {/* Left Arrow */}
-              <button
-                onClick={() => scroll("left")}
-                className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 bg-white shadow-md p-2 rounded-full z-10 hover:bg-gray-100"
-              >
-                <ChevronLeft className="w-6 h-6 text-gray-700" />
-              </button>
-
-              {/* Right Arrow */}
-              <button
-                onClick={() => scroll("right")}
-                className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 bg-white shadow-md p-2 rounded-full z-10 hover:bg-gray-100"
-              >
-                <ChevronRight className="w-6 h-6 text-gray-700" />
-              </button>
             </div>
 
+            {/* Footer */}
+            <footer className="flex-shrink-0 py-4 sm:py-5 px-4 sm:px-6 bg-white border-t border-gray-200">
+              <div className="max-w-7xl mx-auto">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-gray-600">
+                    <a href="/privacy-policy" target="_blank" className="hover:text-[#4F46E5] transition-colors" onClick={(e) => { e.preventDefault(); setLegalDoc("Privacy Policy"); fetch('/privacy-policy').then(res => res.text()).then(text => setLegalContent(text)); setIsLegalDialogOpen(true); }}>
+                      Privacy Policy
+                    </a>
+                    <a href="/terms-of-condition" target="_blank" className="hover:text-[#4F46E5] transition-colors" onClick={(e) => { e.preventDefault(); setLegalDoc("Terms of Condition"); fetch('/terms-of-condition').then(res => res.text()).then(text => setLegalContent(text)); setIsLegalDialogOpen(true); }}>
+                      Terms of Condition
+                    </a>
+                    <a href="/terms-of-use" target="_blank" className="hover:text-[#4F46E5] transition-colors" onClick={(e) => { e.preventDefault(); setLegalDoc("Terms of Use"); fetch('/terms-of-use').then(res => res.text()).then(text => setLegalContent(text)); setIsLegalDialogOpen(true); }}>
+                      Terms of Use
+                    </a>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    © 2025 Mizual. All rights reserved.
+                  </div>
+                </div>
+              </div>
+            </footer>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+            <Dialog open={isLegalDialogOpen} onOpenChange={setIsLegalDialogOpen}>
+              <DialogContent className="prose lg:prose-xl p-8">
+                <DialogHeader>
+                  <DialogTitle>{legalDoc}</DialogTitle>
+                  <DialogDescription dangerouslySetInnerHTML={{ __html: legalContent }} />
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
         {currentView === "upload" && (
-          <div className="relative h-full w-full p-2">
-            {/* Back Button - Top Left <div className="relative pl-16 mb-6"> */}
+          <div className="relative h-full w-full p-4">
+            {/* Back Button */}
             <Button
               variant="ghost"
               onClick={resetEditor}
-              className="absolute top-2 left-0 sm:top-4 sm:left-4 z-10 w-10 h-10 sm:w-10 sm:h-10 bg-white hover:bg-gray-100 shadow-md rounded-xl border border-[#D1D5DB] flex items-center justify-center"
+              className="absolute top-4 left-4 z-10 w-10 h-10 bg-white hover:bg-gray-100 shadow-md rounded-xl border border-[#D1D5DB] flex items-center justify-center"
             >
               <ArrowLeft className="w-5 h-5 text-[#1C1C1E]" />
             </Button>
 
-            <div className="relative w-full h-[calc(100%-4rem)] inset-0 flex items-center justify-center pointer-events-none">
-              {/* Image Preview pl-14 sm:pl-0  
-              <div className="bg-white w-full max-w-md mx-auto border border-[#D1D5DB] flex items-center justify-center overflow-hidden">
-              className={`object-contain w-full h-auto max-h-[60vh] sm:max-h-[70vh] md:max-h-[70vh] lg:max-h-[70vh]`}
- 
-              */}
-
-              <Image
-                src={uploadedImage || "/placeholder.svg"}
-                alt="Uploaded image"
-                className={`max-h-full max-w-full object-contain`}
-              />
+            {/* Image Preview Container */}
+            <div className="w-full h-full flex items-center justify-center pb-20">
+              <div className="relative max-w-full max-h-full">
+                <Image
+                  src={uploadedImage || "/placeholder.svg"}
+                  alt="Uploaded image"
+                  width={500}
+                  height={500}
+                  className="max-h-[calc(100vh-200px)] max-w-full object-contain"
+                  style={{ width: 'auto', height: 'auto' }}
+                />
+              </div>
             </div>
-            {/* Prompt Input 1, We have defined a fix height for this prompt input i.e h-12 sm:h-14left-1/2 -translate-x-1/2 w-full max-w-screen-md
-             */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-screen-md px-4 z-10">
-              <div className="flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
+
+            {/* Prompt Input */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-screen-md px-4">
+              <div className="relative flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
                 <textarea
                   ref={textareaRef}
                   value={prompt}
                   placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
                   rows={1}
-                  className="w-full resize-none overflow-auto max-h-[45vh] min-h-12 text-base lg:text-xl px-4 pr-14 py-2 bg-transparent leading-none focus:outline-none text-[#1C1C1E]"
+                  className="flex-1 w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -478,16 +525,15 @@ export default function AIImageEditor() {
                   }}
                 />
 
-                {/* Embedded Right Arrow Button */}
                 <button
                   onClick={handleSubmitPrompt}
                   disabled={!prompt.trim() || isProcessing}
-                  className="absolute absolute top-1/2 right-4 -translate-y-1/2 mr-1 sm:mr-2 w-10 h-10 mr-1 sm:mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center focus:outline-none focus:ring-0"
+                  className="w-9 h-9 sm:w-10 sm:h-10 mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isProcessing ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <ChevronRight className="w-6 h-6" />
+                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                   )}
                 </button>
               </div>
@@ -496,17 +542,10 @@ export default function AIImageEditor() {
         )}
 
         {currentView === "output" && (
-          <div className="relative flex flex-col h-full p-2 justify-center items-center">
-            {/*
-            <div className="text-center mb-4">
-              <h2 className="text-2xl font-bold text-[#1C1C1E] mb-2">Your Edited Image</h2>
-              <p className="text-gray-600">Choose your favorite variant or refine further</p>
-            </div>
-            */}
-
-            {/* Image with Navigation  w-full h-[calc(100%-3rem)]  */}
+          <div className="relative flex flex-col h-full p-4">
+            {/* Image with Navigation */}
             <div
-              className="relative w-full h-[calc(100%-12rem)] flex items-center justify-center min-h-0"
+              className="relative flex-1 flex items-center justify-center min-h-0"
               onTouchStart={(e) => {
                 const touch = e.touches[0]
                 e.currentTarget.dataset.startX = touch.clientX.toString()
@@ -517,117 +556,121 @@ export default function AIImageEditor() {
                 const diff = startX - endX
 
                 if (Math.abs(diff) > 50) {
-                  // Minimum swipe distance
                   if (diff > 0) {
-                    nextVariant() // Swipe left = next
+                    nextVariant()
                   } else {
-                    prevVariant() // Swipe right = previous
+                    prevVariant()
                   }
                 }
               }}
             >
-              {/* Left Navigation Button */}
+              {/* Navigation Buttons */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={prevVariant}
-                className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute left-0 top-1/2 -translate-y-1/2"
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute left-0 top-1/2 -translate-y-1/2 z-10"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </Button>
 
-              {/* Image */}
-              <div className="bg-white h-full border border-[#D1D5DB] flex items-center justify-center overflow-hidden">
+              {/* Main Image */}
+              <div className="relative w-full h-full flex items-center justify-center">
                 <Image
                   src={generatedVariants[currentVariant] || "/placeholder.svg"}
                   alt="Generated image variant"
-                  className={`max-h-full max-w-full object-contain cursor-pointer`}
+                  layout="fill"
+                  objectFit="contain"
+                  className="cursor-pointer"
                   onClick={() => setIsFullscreen(true)}
                 />
               </div>
-              {/* Floating Download Button */}
+
+              {/* Download Button */}
               <Button
                 onClick={handleDownload}
                 size="icon"
-                className="absolute bottom-4 right-4 w-12 h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
+                className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
                 title="Download Image"
               >
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
-              {/* Right Navigation Button */}
+
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={nextVariant}
-                className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute right-0 top-1/2 -translate-y-1/2"
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute right-0 top-1/2 -translate-y-1/2 z-10"
               >
-                <ChevronRight className="w-6 h-6" />
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
               </Button>
             </div>
 
             {/* Thumbnail Navigation */}
-            <div className="relative z-10 w-full max-w-screen-md flex justify-center items-center py-4 mb-6">
-              <div className="flex gap-2 sm:gap-3 w-full justify-center">
+            <div className="flex-shrink-0 w-full flex justify-center items-center py-3 sm:py-4">
+              <div className="flex gap-2 sm:gap-3">
                 {generatedVariants.map((variant, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentVariant(index)}
-                    className={`relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${
+                    className={`relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${
                       index === currentVariant 
-                        ? "border-[#4F46E5] shadow-lg" 
+                        ? "border-[#4F46E5] shadow-lg ring-2 ring-[#4F46E5]/20" 
                         : "border-[#D1D5DB] hover:border-gray-400"
                     }`}
                   >
                     <Image
                       src={variant}
                       alt={`Variant ${index + 1}`}
-                      className="w-full h-full object-cover"
+                      width={64}
+                      height={64}
+                      objectFit="cover"
                     />
                   </button>
                 ))}
               </div>
             </div>
 
-              {/* Prompt Input - same placement as upload view */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-screen-md px-4 z-10">
-                <div className="flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
-                  <textarea
-                    ref={textareaRef}
-                    value={prompt}
-                    placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
-                    rows={1}
-                    className="w-full resize-none overflow-auto max-h-[45vh] min-h-12 text-base lg:text-xl px-4 pr-14 py-2 bg-transparent leading-none focus:outline-none text-[#1C1C1E]"
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        if (prompt.trim() && !isProcessing) {
-                          handleSubmitPrompt()
-                        }
+            {/* Prompt Input */}
+            <div className="flex-shrink-0 w-full max-w-screen-md mx-auto px-4 pb-4">
+              <div className="relative flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
+                <textarea
+                  ref={textareaRef}
+                  value={prompt}
+                  placeholder="Refine further: 'Make it brighter', 'Add sunset colors'"
+                  rows={1}
+                  className="flex-1 w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (prompt.trim() && !isProcessing) {
+                        handleSubmitPrompt()
                       }
-                    }}
-                  />
+                    }
+                  }}
+                />
 
-                  {/* Embedded Right Arrow Button */}
-                  <button
-                    onClick={handleSubmitPrompt}
-                    disabled={!prompt.trim() || isProcessing}
-                    className="absolute absolute top-1/2 right-4 -translate-y-1/2 mr-1 sm:mr-2 w-10 h-10 mr-1 sm:mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center focus:outline-none focus:ring-0"
-                  >
-                    {isProcessing ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <ChevronRight className="w-6 h-6" />
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={handleSubmitPrompt}
+                  disabled={!prompt.trim() || isProcessing}
+                  className="w-9 h-9 sm:w-10 sm:h-10 mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isProcessing ? (
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+                  )}
+                </button>
               </div>
+            </div>
           </div>
         )}
 
+        {/* Fullscreen View */}
         {isFullscreen && (
           <div
-            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
             onClick={() => setIsFullscreen(false)}
           >
             <div className="relative w-full h-full flex items-center justify-center">
@@ -638,13 +681,13 @@ export default function AIImageEditor() {
                   e.stopPropagation()
                   prevVariant()
                 }}
-                className="w-12 h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute left-4 top-1/2 -translate-y-1/2 z-10"
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </Button>
 
               <div
-                className="relative w-full h-full flex items-center justify-center touch-pan-y"
+                className="relative w-full h-full flex items-center justify-center"
                 onTouchStart={(e) => {
                   const touch = e.touches[0]
                   e.currentTarget.dataset.startX = touch.clientX.toString()
@@ -666,7 +709,8 @@ export default function AIImageEditor() {
                 <Image
                   src={generatedVariants[currentVariant] || "/placeholder.svg"}
                   alt="Generated image variant - Fullscreen"
-                  className="max-w-[90vw] max-h-[90vh] w-auto h-auto object-contain"
+                  layout="fill"
+                  objectFit="contain"
                 />
               </div>
 
@@ -677,14 +721,14 @@ export default function AIImageEditor() {
                   e.stopPropagation()
                   nextVariant()
                 }}
-                className="w-12 h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute right-4 top-1/2 -translate-y-1/2 z-10"
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10"
               >
-                <ChevronRight className="w-6 h-6" />
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
               </Button>
 
               <button
                 onClick={() => setIsFullscreen(false)}
-                className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-colors z-10"
+                className="absolute top-4 right-4 w-8 h-8 sm:w-10 sm:h-10 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition-colors z-10 text-sm sm:text-base"
               >
                 ✕
               </button>
@@ -695,10 +739,10 @@ export default function AIImageEditor() {
 
       {/* Processing Stage Debug Info */}
       {isProcessing && processingStage && (
-        <div className="fixed bottom-4 left-4 z-40 bg-blue-100 border border-blue-200 rounded-lg shadow-lg p-3">
+        <div className="fixed bottom-20 sm:bottom-4 left-4 z-40 bg-blue-100 border border-blue-200 rounded-lg shadow-lg p-2 sm:p-3">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-            <p className="text-sm text-blue-800 font-medium">
+            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-full animate-pulse"></div>
+            <p className="text-xs sm:text-sm text-blue-800 font-medium">
               Stage: {processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </p>
           </div>
@@ -707,14 +751,14 @@ export default function AIImageEditor() {
 
       {/* Toast Message */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+        <div className="fixed top-20 sm:top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 sm:p-4 max-w-[calc(100vw-2rem)] sm:max-w-sm">
           <div className="flex items-start">
             <div className="flex-1">
-              <p className="text-sm text-gray-900">{toastMessage}</p>
+              <p className="text-xs sm:text-sm text-gray-900">{toastMessage}</p>
             </div>
             <button
               onClick={() => setToastMessage(null)}
-              className="ml-3 text-gray-400 hover:text-gray-600 text-lg leading-none"
+              className="ml-3 text-gray-400 hover:text-gray-600 text-base sm:text-lg leading-none"
             >
               ✕
             </button>
