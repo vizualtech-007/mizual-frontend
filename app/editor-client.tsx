@@ -133,6 +133,7 @@ export default function AIImageEditor() {
 
     
     setIsProcessing(true);
+    setProcessingStage("enhancing_prompt"); // Show immediate feedback
     setBaseImageForEdit(sourceImage);
 
     let apiUrl = typeof window !== 'undefined'
@@ -237,7 +238,7 @@ export default function AIImageEditor() {
           setEditId(null);
           // Don't auto-clear failed message - user should see it until they take action
         } else {
-          setTimeout(poll, 1000);
+          setTimeout(poll, 2000); // Reduced polling frequency to 2 seconds
         }
         } catch (error) {
           console.error('Polling error:', error);
