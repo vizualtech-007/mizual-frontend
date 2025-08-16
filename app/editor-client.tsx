@@ -146,6 +146,9 @@ export default function AIImageEditor() {
 
     if (!prompt.trim() || !sourceImage) return;
 
+    // Show initial toast messages
+    showToast("Starting your image edit...");
+    
     setIsProcessing(true);
     setBaseImageForEdit(sourceImage);
 
@@ -156,20 +159,33 @@ export default function AIImageEditor() {
       : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     apiUrl = apiUrl.replace(/\/$/, '');
+    
+    // Show image preparation toast
+    showToast("Preparing your image...");
+    
     let imagePayload: string;
     try {
       imagePayload = await ensureDataUrl(sourceImage);
     } catch (e) {
       setIsProcessing(false);
+      showToast("Failed to prepare image. Please try again.");
+      isSubmittingRef.current = false;
       return;
     }
 
     const isChainEdit = currentView === "output" && generatedVariants.length > 0;
     const parentUuid = isChainEdit ? currentEditUuid : undefined;
 
+    // Show submission toast
+    showToast("Sending your request to AI...");
+
     let attempt = 0;
     let response: Response | null = null;
     while (attempt < 3) {
+      if (attempt > 0) {
+        showToast(`Server busy, retrying... (attempt ${attempt + 1}/3)`);
+      }
+      
       response = await fetch(`${apiUrl}/edit-image/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -190,12 +206,17 @@ export default function AIImageEditor() {
 
     if (!response || !response.ok) {
       setIsProcessing(false);
+      showToast("Failed to submit request. Please try again.");
       isSubmittingRef.current = false;
       return;
     }
 
     const data = await response.json();
     setEditId(data.edit_id);
+    
+    // Show success toast
+    showToast("Request submitted! Processing your edit...");
+    
     isSubmittingRef.current = false;
   }
 
@@ -358,7 +379,7 @@ export default function AIImageEditor() {
             <div className="flex-grow flex flex-col justify-center px-4 sm:px-6 lg:px-8 pt-8 lg:pt-4">
               <div className="text-center mb-6 sm:mb-8">
                 <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#1C1C1E] mb-2 sm:mb-3">
-                  ✨ Instantly Edit Your Photos with AI
+                  Instantly Edit Your Photos with AI
                 </h1>
               </div>
               <div
