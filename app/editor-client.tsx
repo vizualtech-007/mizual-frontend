@@ -507,13 +507,13 @@ export default function AIImageEditor() {
 
             {/* Prompt Input */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-screen-md px-4">
-              <div className="flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
+              <div className="relative flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
                 <textarea
                   ref={textareaRef}
                   value={prompt}
                   placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
                   rows={1}
-                  className="w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 pr-14 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
+                  className="flex-1 w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -528,7 +528,7 @@ export default function AIImageEditor() {
                 <button
                   onClick={handleSubmitPrompt}
                   disabled={!prompt.trim() || isProcessing}
-                  className="absolute top-1/2 right-2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="w-9 h-9 sm:w-10 sm:h-10 mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isProcessing ? (
                     <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -633,13 +633,13 @@ export default function AIImageEditor() {
 
             {/* Prompt Input */}
             <div className="flex-shrink-0 w-full max-w-screen-md mx-auto px-4 pb-4">
-              <div className="flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
+              <div className="relative flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
                 <textarea
                   ref={textareaRef}
                   value={prompt}
                   placeholder="Refine further: 'Make it brighter', 'Add sunset colors'"
                   rows={1}
-                  className="w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 pr-14 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
+                  className="flex-1 w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -654,7 +654,7 @@ export default function AIImageEditor() {
                 <button
                   onClick={handleSubmitPrompt}
                   disabled={!prompt.trim() || isProcessing}
-                  className="absolute top-1/2 right-2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="w-9 h-9 sm:w-10 sm:h-10 mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isProcessing ? (
                     <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
