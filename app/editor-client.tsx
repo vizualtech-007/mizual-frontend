@@ -728,13 +728,13 @@ export default function AIImageEditor() {
         )}
       </main>
 
-      {/* Processing Stage Debug Info */}
+      {/* Processing Stage Info - Responsive */}
       {isProcessing && processingStage && (
-        <div className="fixed bottom-20 sm:bottom-4 left-4 z-40 bg-blue-100 border border-blue-200 rounded-lg shadow-lg p-2 sm:p-3">
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-full animate-pulse"></div>
-            <p className="text-xs sm:text-sm text-blue-800 font-medium">
-              Stage: {processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        <div className="fixed bottom-4 left-4 right-4 sm:left-4 sm:right-auto sm:max-w-xs z-40 bg-blue-100 border border-blue-200 rounded-lg shadow-lg p-3 sm:p-3">
+          <div className="flex items-center justify-center sm:justify-start space-x-2">
+            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
+            <p className="text-xs sm:text-sm text-blue-800 font-medium text-center sm:text-left truncate">
+              {processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </p>
           </div>
         </div>
