@@ -379,7 +379,7 @@ export default function AIImageEditor() {
             <div className="flex-grow flex flex-col justify-center px-4 sm:px-6 lg:px-8 pt-8 lg:pt-4">
               <div className="text-center mb-6 sm:mb-8">
                 <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#1C1C1E] mb-2 sm:mb-3">
-                  Instantly Edit Your Photos with AI
+                  ✨ Instantly Edit Your Photos with AI
                 </h1>
               </div>
               <div
