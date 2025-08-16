@@ -232,13 +232,10 @@ export default function AIImageEditor() {
           setUploadedImage(pollData.edited_image_url);
         } else if (pollData.status === 'failed') {
           setIsProcessing(false);
-          setProcessingStage("failed"); // Show failed stage with error message
+          setProcessingStage("failed"); // Show failed stage with error message - stays visible
           setCurrentView("upload");
           setEditId(null);
-          // Clear the failed stage after 5 seconds
-          setTimeout(() => {
-            setProcessingStage("");
-          }, 5000);
+          // Don't auto-clear failed message - user should see it until they take action
         } else {
           setTimeout(poll, 1000);
         }
@@ -751,7 +748,7 @@ export default function AIImageEditor() {
                 : "text-blue-800"
             }`}>
               {processingStage === "failed" 
-                ? "Image editing failed. The AI service is currently unavailable. Please try again later."
+                ? "Image editing failed."
                 : processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
               }
             </p>
