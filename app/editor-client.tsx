@@ -232,9 +232,13 @@ export default function AIImageEditor() {
           setUploadedImage(pollData.edited_image_url);
         } else if (pollData.status === 'failed') {
           setIsProcessing(false);
-          setProcessingStage(""); // Clear stage
+          setProcessingStage("failed"); // Show failed stage with error message
           setCurrentView("upload");
           setEditId(null);
+          // Clear the failed stage after 5 seconds
+          setTimeout(() => {
+            setProcessingStage("");
+          }, 5000);
         } else {
           setTimeout(poll, 1000);
         }
