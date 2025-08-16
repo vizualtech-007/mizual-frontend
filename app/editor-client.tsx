@@ -228,13 +228,11 @@ export default function AIImageEditor() {
           setCurrentView("output");
           setEditId(null); // Clear editId to stop polling
           setUploadedImage(pollData.edited_image_url);
-          showToast("Image editing completed successfully!");
         } else if (pollData.status === 'failed') {
           setIsProcessing(false);
           setProcessingStage(""); // Clear stage
           setCurrentView("upload");
           setEditId(null);
-          showToast(`Image editing failed. Please try again with a different prompt or image.`);
         } else {
           setTimeout(poll, 1000);
         }
@@ -243,7 +241,6 @@ export default function AIImageEditor() {
           setIsProcessing(false);
           setProcessingStage(""); // Clear stage
           setEditId(null);
-          showToast(`Network error while checking status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       };
       poll();
