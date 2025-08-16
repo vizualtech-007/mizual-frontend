@@ -33,7 +33,6 @@ export default function AIImageEditor() {
   const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
   const [processingStage, setProcessingStage] = useState<string>("");
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDocument | null>(null);
   const [isLegalDialogOpen, setIsLegalDialogOpen] = useState(false);
   const [legalContent, setLegalContent] = useState("");
@@ -41,20 +40,6 @@ export default function AIImageEditor() {
 
   
 
-  // Toast auto-hide functionality
-  useEffect(() => {
-    if (toastMessage) {
-      const timer = setTimeout(() => {
-        setToastMessage(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [toastMessage]);
-
-  // Show toast message
-  const showToast = (message: string) => {
-    setToastMessage(message);
-  };
 
   const ensureDataUrl = async (src: string): Promise<string> => {
     if (src.startsWith("data:")) return src;
@@ -146,8 +131,6 @@ export default function AIImageEditor() {
 
     if (!prompt.trim() || !sourceImage) return;
 
-    // Show initial toast messages
-    showToast("Starting your image edit...");
     
     setIsProcessing(true);
     setBaseImageForEdit(sourceImage);
@@ -160,15 +143,12 @@ export default function AIImageEditor() {
 
     apiUrl = apiUrl.replace(/\/$/, '');
     
-    // Show image preparation toast
-    showToast("Preparing your image...");
     
     let imagePayload: string;
     try {
       imagePayload = await ensureDataUrl(sourceImage);
     } catch (e) {
       setIsProcessing(false);
-      showToast("Failed to prepare image. Please try again.");
       isSubmittingRef.current = false;
       return;
     }
@@ -176,14 +156,11 @@ export default function AIImageEditor() {
     const isChainEdit = currentView === "output" && generatedVariants.length > 0;
     const parentUuid = isChainEdit ? currentEditUuid : undefined;
 
-    // Show submission toast
-    showToast("Sending your request to AI...");
 
     let attempt = 0;
     let response: Response | null = null;
     while (attempt < 3) {
       if (attempt > 0) {
-        showToast(`Server busy, retrying... (attempt ${attempt + 1}/3)`);
       }
       
       response = await fetch(`${apiUrl}/edit-image/`, {
@@ -206,7 +183,6 @@ export default function AIImageEditor() {
 
     if (!response || !response.ok) {
       setIsProcessing(false);
-      showToast("Failed to submit request. Please try again.");
       isSubmittingRef.current = false;
       return;
     }
@@ -214,8 +190,6 @@ export default function AIImageEditor() {
     const data = await response.json();
     setEditId(data.edit_id);
     
-    // Show success toast
-    showToast("Request submitted! Processing your edit...");
     
     isSubmittingRef.current = false;
   }
@@ -256,13 +230,11 @@ export default function AIImageEditor() {
           setCurrentView("output");
           setEditId(null); // Clear editId to stop polling
           setUploadedImage(pollData.edited_image_url);
-          showToast("Image editing completed successfully!");
         } else if (pollData.status === 'failed') {
           setIsProcessing(false);
           setProcessingStage(""); // Clear stage
           setCurrentView("upload");
           setEditId(null);
-          showToast(`Image editing failed. Please try again with a different prompt or image.`);
         } else {
           setTimeout(poll, 1000);
         }
@@ -271,7 +243,6 @@ export default function AIImageEditor() {
           setIsProcessing(false);
           setProcessingStage("");
           setEditId(null);
-          showToast(`Network error while checking status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       };
       poll();
@@ -378,7 +349,7 @@ export default function AIImageEditor() {
             <div className="flex-grow flex flex-col justify-center px-4 sm:px-6 lg:px-8 pt-8 lg:pt-4">
               <div className="text-center mb-6 sm:mb-8">
                 <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#1C1C1E] mb-2 sm:mb-3">
-                  ✨ Instantly Edit Your Photos with AI
+                  Instantly Edit Your Photos with AI
                 </h1>
               </div>
               <div
@@ -769,22 +740,6 @@ export default function AIImageEditor() {
         </div>
       )}
 
-      {/* Toast Message */}
-      {toastMessage && (
-        <div className="fixed top-20 sm:top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 sm:p-4 max-w-[calc(100vw-2rem)] sm:max-w-sm">
-          <div className="flex items-start">
-            <div className="flex-1">
-              <p className="text-xs sm:text-sm text-gray-900">{toastMessage}</p>
-            </div>
-            <button
-              onClick={() => setToastMessage(null)}
-              className="ml-3 text-gray-400 hover:text-gray-600 text-base sm:text-lg leading-none"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
