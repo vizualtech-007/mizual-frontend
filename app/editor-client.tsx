@@ -265,13 +265,25 @@ export default function AIImageEditor() {
             setIsProcessing(false);
             setCurrentView("output");
             setEditId(null);
-            setProcessingStatus(null);
+            // Keep error status to show error message
+            setProcessingStatus({
+              status: 'failed',
+              processing_stage: 'failed',
+              message: pollData.message || 'Image editing failed. Please try again.',
+              progress_percent: 0,
+              is_complete: false,
+              is_error: true
+            });
             // Remove the blank image on error
             setGeneratedVariants(prev => {
               const updated = prev.slice(0, -1);
               setCurrentVariant(Math.max(0, updated.length - 1)); // Go back to last valid image
               return updated;
             });
+            // Clear error message after 5 seconds
+            setTimeout(() => {
+              setProcessingStatus(null);
+            }, 5000);
           } else {
             setTimeout(poll, 2000); // Reduced polling frequency to 2 seconds
           }
@@ -606,7 +618,23 @@ export default function AIImageEditor() {
 
               {/* Image */}
               <div className="bg-white h-full border border-[#D1D5DB] flex items-center justify-center overflow-hidden">
-                {generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 ? (
+                {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') ? (
+                  <div className="relative w-full h-full">
+                    {/* Current image (not faded for errors) */}
+                    <Image
+                      src={generatedVariants[currentVariant] || "/placeholder.svg"}
+                      alt="Current image"
+                      className="w-full h-full object-contain"
+                    />
+                    {/* Error overlay */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90">
+                      <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
+                        <p className="text-lg font-medium text-red-800 mb-2">Edit Failed</p>
+                        <p className="text-sm text-red-600">{processingStatus.message}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 ? (
                   <div className="relative w-full h-full">
                     {/* Faded input image */}
                     <Image
