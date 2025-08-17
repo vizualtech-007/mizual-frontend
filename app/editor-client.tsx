@@ -32,14 +32,18 @@ export default function AIImageEditor() {
   const [baseImageForEdit, setBaseImageForEdit] = useState<string | null>(null);
   const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
-  const [processingStage, setProcessingStage] = useState<string>("");
+  const [processingStatus, setProcessingStatus] = useState<{
+    status: string;
+    processing_stage: string;
+    message: string;
+    progress_percent: number;
+    is_complete: boolean;
+    is_error: boolean;
+  } | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDocument | null>(null);
   const [isLegalDialogOpen, setIsLegalDialogOpen] = useState(false);
   const [legalContent, setLegalContent] = useState("");
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
-
-  
-
 
   const ensureDataUrl = async (src: string): Promise<string> => {
     if (src.startsWith("data:")) return src;
@@ -133,8 +137,27 @@ export default function AIImageEditor() {
 
     
     setIsProcessing(true);
-    setProcessingStage("enhancing_prompt"); // Show immediate feedback
     setBaseImageForEdit(sourceImage);
+    setProcessingStatus({
+      status: "processing",
+      processing_stage: "initializing",
+      message: "Starting image processing...",
+      progress_percent: 0,
+      is_complete: false,
+      is_error: false
+    });
+    // Add a blank space for the new image while preserving existing ones
+    const placeholderImageUrl = sourceImage; // Use the input image as placeholder
+    if (currentView === "output" && generatedVariants.length > 0) {
+      // We're already in output view, add blank image
+      setGeneratedVariants(prev => [...prev, placeholderImageUrl]);
+      setCurrentVariant(generatedVariants.length);
+    } else {
+      // First time, create array with original and blank
+      setGeneratedVariants([sourceImage, placeholderImageUrl]);
+      setCurrentVariant(1);
+      setCurrentView("output");
+    }
 
     let apiUrl = typeof window !== 'undefined'
       ? window.location.hostname.includes('git-dev')
@@ -214,36 +237,48 @@ export default function AIImageEditor() {
 
           const pollData = await pollResponse.json();
 
-          if (pollData.processing_stage) {
-            setProcessingStage(pollData.processing_stage);
+          // Update processing status
+          setProcessingStatus({
+            status: pollData.status,
+            processing_stage: pollData.processing_stage || "processing",
+            message: pollData.message || "Processing image...",
+            progress_percent: pollData.progress_percent || 0,
+            is_complete: pollData.is_complete || false,
+            is_error: pollData.is_error || false
+          });
+
+          if (pollData.is_complete && !pollData.is_error && pollData.edited_image_url) {
+            const base = baseImageForEdit || uploadedImage;
+            const newUrl = pollData.edited_image_url;
+            // Replace the blank image with the actual result
+            setGeneratedVariants(prev => {
+              const updated = [...prev];
+              updated[updated.length - 1] = newUrl;
+              return updated;
+            });
+            setCurrentEditUuid(editId); // Track edit UUID for chaining
+            setIsProcessing(false);
+            setEditId(null); // Clear editId to stop polling
+            setUploadedImage(pollData.edited_image_url);
+            setProcessingStatus(null);
+          } else if (pollData.is_error || pollData.status === 'failed') {
+            setIsProcessing(false);
+            setCurrentView("output");
+            setEditId(null);
+            setProcessingStatus(null);
+            // Remove the blank image on error
+            setGeneratedVariants(prev => {
+              const updated = prev.slice(0, -1);
+              setCurrentVariant(Math.max(0, updated.length - 1)); // Go back to last valid image
+              return updated;
+            });
+          } else {
+            setTimeout(poll, 2000); // Reduced polling frequency to 2 seconds
           }
-        if (pollData.status === 'completed') {
-          const base = baseImageForEdit || uploadedImage;
-          const newUrl = pollData.edited_image_url as string;
-          const nextVariants = generatedVariants.length === 0
-            ? [base as string, newUrl]
-            : [...generatedVariants, newUrl];
-          setGeneratedVariants(nextVariants);
-          setCurrentVariant(nextVariants.length - 1); // Focus on the newest image
-          setCurrentEditUuid(editId); // Track edit UUID for chaining
-          setIsProcessing(false);
-          setProcessingStage(""); // Clear stage
-          setCurrentView("output");
-          setEditId(null); // Clear editId to stop polling
-          setUploadedImage(pollData.edited_image_url);
-        } else if (pollData.status === 'failed') {
-          setIsProcessing(false);
-          setProcessingStage("failed"); // Show failed stage with error message - stays visible
-          setCurrentView("upload");
-          setEditId(null);
-          // Don't auto-clear failed message - user should see it until they take action
-        } else {
-          setTimeout(poll, 2000); // Reduced polling frequency to 2 seconds
-        }
         } catch (error) {
           console.error('Polling error:', error);
           setIsProcessing(false);
-          setProcessingStage("");
+          setProcessingStatus(null);
           setEditId(null);
         }
       };
@@ -277,6 +312,8 @@ export default function AIImageEditor() {
     setCurrentVariant(0)
     setGeneratedVariants([]);
     setEditId(null);
+    setProcessingStatus(null);
+    setCurrentEditUuid(null);
   }
 
   useEffect(() => {
@@ -567,16 +604,39 @@ export default function AIImageEditor() {
                 <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </Button>
 
-              {/* Main Image */}
-              <div className="relative w-full h-full flex items-center justify-center">
-                <Image
-                  src={generatedVariants[currentVariant] || "/placeholder.svg"}
-                  alt="Generated image variant"
-                  layout="fill"
-                  objectFit="contain"
-                  className="cursor-pointer"
-                  onClick={() => setIsFullscreen(true)}
-                />
+              {/* Image */}
+              <div className="bg-white h-full border border-[#D1D5DB] flex items-center justify-center overflow-hidden">
+                {generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 ? (
+                  <div className="relative w-full h-full">
+                    {/* Faded input image */}
+                    <Image
+                      src={generatedVariants[currentVariant] || "/placeholder.svg"}
+                      alt="Input image (processing)"
+                      className="w-full h-full object-contain opacity-30"
+                    />
+                    {/* Loading overlay */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-white/80">
+                      <p className="text-lg font-medium text-[#1C1C1E]">{processingStatus.message}</p>
+                      {processingStatus.progress_percent > 0 && (
+                        <div className="w-full flex justify-center">
+                          <div className="w-48 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-[#4F46E5] h-2 rounded-full transition-all duration-300" 
+                              style={{ width: `${processingStatus.progress_percent}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <Image
+                    src={generatedVariants[currentVariant] || "/placeholder.svg"}
+                    alt="Generated image variant"
+                    className={`max-h-full max-w-full object-contain cursor-pointer`}
+                    onClick={() => setIsFullscreen(true)}
+                  />
+                )}
               </div>
 
               {/* Download Button */}
@@ -615,9 +675,11 @@ export default function AIImageEditor() {
                     <Image
                       src={variant}
                       alt={`Variant ${index + 1}`}
-                      width={64}
-                      height={64}
-                      objectFit="cover"
+                      className={`w-full h-full object-cover ${
+                        variant === baseImageForEdit && processingStatus && index === generatedVariants.length - 1 
+                          ? "opacity-50" 
+                          : "opacity-100"
+                      }`}
                     />
                   </button>
                 ))}
@@ -729,34 +791,6 @@ export default function AIImageEditor() {
           </div>
         )}
       </main>
-
-      {/* Processing Stage Info - Responsive */}
-      {(isProcessing || processingStage === "failed") && processingStage && (
-        <div className={`fixed bottom-4 left-4 right-4 sm:left-4 sm:right-auto sm:max-w-xs z-40 border rounded-lg shadow-lg p-3 sm:p-3 ${
-          processingStage === "failed" 
-            ? "bg-red-100 border-red-200" 
-            : "bg-blue-100 border-blue-200"
-        }`}>
-          <div className="flex items-center justify-center sm:justify-start space-x-2">
-            <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${
-              processingStage === "failed" 
-                ? "bg-red-500" 
-                : "bg-blue-500 animate-pulse"
-            }`}></div>
-            <p className={`text-xs sm:text-sm font-medium text-center sm:text-left truncate ${
-              processingStage === "failed" 
-                ? "text-red-800" 
-                : "text-blue-800"
-            }`}>
-              {processingStage === "failed" 
-                ? "Image editing failed."
-                : processingStage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-              }
-            </p>
-          </div>
-        </div>
-      )}
-
     </div>
   )
 }
