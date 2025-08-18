@@ -159,11 +159,7 @@ export default function AIImageEditor() {
       setCurrentView("output");
     }
 
-    let apiUrl = typeof window !== 'undefined'
-      ? window.location.hostname.includes('git-dev')
-        ? 'https://mizual-backend-dev.onrender.com'
-        : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    let apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     apiUrl = apiUrl.replace(/\/$/, '');
     
@@ -221,11 +217,7 @@ export default function AIImageEditor() {
   useEffect(() => {
     if (editId) {
       const poll = async () => {
-        let apiUrl = typeof window !== 'undefined'
-          ? window.location.hostname.includes('git-dev')
-            ? 'https://mizual-backend-dev.onrender.com'
-            : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-          : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
         try {
           apiUrl = apiUrl.replace(/\/$/, '');
