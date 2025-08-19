@@ -232,11 +232,11 @@ export default function AIImageEditor() {
           setCurrentVariant(Math.max(0, updated.length - 1));
           return updated;
         });
-        
-        // Always switch back to upload view on upload error
-        // This ensures thumbnails and navigation disappear
-        setCurrentView("upload");
       }
+      
+      // Always switch back to upload view on upload error
+      // This ensures thumbnails and navigation disappear
+      setCurrentView("upload");
       
       setIsProcessing(false);
       isSubmittingRef.current = false;
