@@ -578,6 +578,16 @@ export default function AIImageEditor() {
                   className="max-h-[calc(100vh-200px)] max-w-full object-contain"
                   style={{ width: 'auto', height: 'auto' }}
                 />
+                
+                {/* Error overlay for upload view */}
+                {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90 rounded-lg">
+                    <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
+                      <p className="text-lg font-medium text-red-800 mb-2">Upload Failed</p>
+                      <p className="text-sm text-red-600">{processingStatus.message}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
