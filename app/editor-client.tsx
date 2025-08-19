@@ -233,10 +233,9 @@ export default function AIImageEditor() {
           return updated;
         });
         
-        // Check if we need to switch back to upload view (after state update)
-        if (generatedVariants.length === 1) {
-          setCurrentView("upload");
-        }
+        // Always switch back to upload view on upload error
+        // This ensures thumbnails and navigation disappear
+        setCurrentView("upload");
       }
       
       setIsProcessing(false);
