@@ -230,14 +230,13 @@ export default function AIImageEditor() {
         setGeneratedVariants(prev => {
           const updated = prev.slice(0, -1);
           setCurrentVariant(Math.max(0, updated.length - 1));
-          
-          // If no variants left after removal, switch back to upload view
-          if (updated.length === 0) {
-            setCurrentView("upload");
-          }
-          
           return updated;
         });
+        
+        // Check if we need to switch back to upload view (after state update)
+        if (generatedVariants.length === 1) {
+          setCurrentView("upload");
+        }
       }
       
       setIsProcessing(false);
