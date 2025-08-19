@@ -224,13 +224,19 @@ export default function AIImageEditor() {
         is_error: true
       });
       
-      // Remove the placeholder image on upload error
+      // Clean up UI state on upload error
       if (currentView === "output" && generatedVariants.length > 0) {
+        // Remove the placeholder image that was added
         setGeneratedVariants(prev => {
           const updated = prev.slice(0, -1);
           setCurrentVariant(Math.max(0, updated.length - 1));
           return updated;
         });
+        
+        // If no variants left, switch back to upload view
+        if (generatedVariants.length === 1) {
+          setCurrentView("upload");
+        }
       }
       
       setIsProcessing(false);
