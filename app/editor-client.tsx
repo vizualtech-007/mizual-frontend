@@ -202,8 +202,45 @@ export default function AIImageEditor() {
     }
 
     if (!response || !response.ok) {
+      // Handle upload errors (like unsupported image types)
+      let errorMessage = 'Upload failed. Please try again.';
+      
+      if (response) {
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch (e) {
+          // If we can't parse the error response, use default message
+        }
+      }
+      
+      // Show error using the same system as processing errors
+      setProcessingStatus({
+        status: 'failed',
+        processing_stage: 'failed',
+        message: errorMessage,
+        progress_percent: 0,
+        is_complete: false,
+        is_error: true
+      });
+      
+      // Remove the placeholder image on upload error
+      if (currentView === "output" && generatedVariants.length > 0) {
+        setGeneratedVariants(prev => {
+          const updated = prev.slice(0, -1);
+          setCurrentVariant(Math.max(0, updated.length - 1));
+          return updated;
+        });
+      }
+      
       setIsProcessing(false);
       isSubmittingRef.current = false;
+      
+      // Clear error message after 8 seconds (longer for upload errors)
+      setTimeout(() => {
+        setProcessingStatus(null);
+      }, 8000);
+      
       return;
     }
 
