@@ -689,7 +689,7 @@ export default function AIImageEditor() {
               </Button>
 
               {/* Image */}
-              <div className="bg-white h-full border border-[#D1D5DB] flex items-center justify-center overflow-hidden">
+              <div className="bg-white h-full border border-[#D1D5DB] flex items-center justify-center overflow-hidden relative">
                 {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') ? (
                   <div className="relative w-full h-full">
                     {/* Current image (not faded for errors) */}
@@ -737,17 +737,19 @@ export default function AIImageEditor() {
                     onClick={() => setIsFullscreen(true)}
                   />
                 )}
+
+                {/* Download Button - now positioned inside the image container */}
+                <Button
+                  onClick={handleDownload}
+                  size="icon"
+                  className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
+                  title="Download Image"
+                >
+                  <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                </Button>
               </div>
 
-              {/* Download Button */}
-              <Button
-                onClick={handleDownload}
-                size="icon"
-                className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
-                title="Download Image"
-              >
-                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-              </Button>
+
 
               <Button
                 variant="ghost"
