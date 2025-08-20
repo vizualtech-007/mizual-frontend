@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { createMockFetch, shouldUseMockAPI } from "@/lib/mock-api"
 
 type ViewState = "home" | "upload" | "output"
 type LegalDocument = "Privacy Policy" | "Terms of Condition" | "Terms of Use"
@@ -44,6 +45,7 @@ export default function AIImageEditor() {
   const [isLegalDialogOpen, setIsLegalDialogOpen] = useState(false);
   const [legalContent, setLegalContent] = useState("");
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [isMockAPIActive, setIsMockAPIActive] = useState(false);
 
   const ensureDataUrl = async (src: string): Promise<string> => {
     if (src.startsWith("data:")) return src;
@@ -387,6 +389,27 @@ export default function AIImageEditor() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [currentView, generatedVariants.length])
 
+  // Initialize mock API when running locally
+  useEffect(() => {
+    if (shouldUseMockAPI()) {
+      // console.log('🔧 Mock API enabled');
+      setIsMockAPIActive(true);
+      
+      // Store original fetch
+      const originalFetch = window.fetch;
+      
+      // Create and set mock fetch
+      const mockFetch = createMockFetch();
+      window.fetch = mockFetch;
+      
+      // Cleanup function to restore original fetch
+      return () => {
+        window.fetch = originalFetch;
+        setIsMockAPIActive(false);
+      };
+    }
+  }, [])
+
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#F8F9FA] flex flex-col">
       {/* Header */}
@@ -396,6 +419,11 @@ export default function AIImageEditor() {
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="text-lg sm:text-xl font-semibold text-[#1C1C1E]">Mizual</span>
+          {isMockAPIActive && (
+            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
+              Mock API
+            </span>
+          )}
         </div>
         {currentView === "output" && (
           <Button
