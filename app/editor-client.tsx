@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { createMockFetch, shouldUseMockAPI } from "@/lib/mock-api"
 
-type ViewState = "home" | "upload" | "output"
+type ViewState = "home" | "output"
 type LegalDocument = "Privacy Policy" | "Terms of Condition" | "Terms of Use"
 
 export default function AIImageEditor() {
@@ -103,8 +103,11 @@ export default function AIImageEditor() {
     if (file) {
       const reader = new FileReader()
       reader.onload = (e) => {
-        setUploadedImage(e.target?.result as string)
-        setCurrentView("upload")
+        const imageData = e.target?.result as string
+        setUploadedImage(imageData)
+        setGeneratedVariants([imageData])
+        setCurrentVariant(0)
+        setCurrentView("output")
       }
       reader.readAsDataURL(file)
     }
@@ -120,8 +123,11 @@ export default function AIImageEditor() {
     if (file && file.type.startsWith("image/")) {
       const reader = new FileReader()
       reader.onload = (e) => {
-        setUploadedImage(e.target?.result as string)
-        setCurrentView("upload")
+        const imageData = e.target?.result as string
+        setUploadedImage(imageData)
+        setGeneratedVariants([imageData])
+        setCurrentVariant(0)
+        setCurrentView("output")
       }
       reader.readAsDataURL(file)
     }
@@ -236,9 +242,9 @@ export default function AIImageEditor() {
         });
       }
       
-      // Always switch back to upload view on upload error
+      // Always switch back to output view on upload error
       // This ensures thumbnails and navigation disappear
-      setCurrentView("upload");
+      setCurrentView("output");
       
       setIsProcessing(false);
       isSubmittingRef.current = false;
@@ -374,7 +380,7 @@ export default function AIImageEditor() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (currentView === "output" && document.activeElement?.tagName !== 'TEXTAREA') {
+      if (currentView === "output" && document.activeElement?.tagName !== 'TEXTAREA' && generatedVariants.length > 1) {
         if (e.key === 'ArrowLeft') {
           e.preventDefault()
           prevVariant()
@@ -496,7 +502,9 @@ export default function AIImageEditor() {
                       onClick={() => {
                         setUploadedImage(useCase.beforeImage);
                         setPrompt(useCase.prompt);
-                        setCurrentView("upload");
+                        setGeneratedVariants([useCase.beforeImage]);
+                        setCurrentVariant(0);
+                        setCurrentView("output");
                       }}
                       className="px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs sm:text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
                     >
@@ -584,87 +592,19 @@ export default function AIImageEditor() {
           </div>
         )}
 
-        {currentView === "upload" && (
-          <div className="relative h-full w-full p-4">
-            {/* Back Button */}
-            <Button
-              variant="ghost"
-              onClick={resetEditor}
-              className="absolute top-4 left-4 z-10 w-10 h-10 bg-white hover:bg-gray-100 shadow-md rounded-xl border border-[#D1D5DB] flex items-center justify-center"
-            >
-              <ArrowLeft className="w-5 h-5 text-[#1C1C1E]" />
-            </Button>
 
-            {/* Image Preview Container */}
-            <div className="w-full h-full flex items-center justify-center pb-20">
-              <div className="relative max-w-full max-h-full">
-                <Image
-                  src={uploadedImage || "/placeholder.svg"}
-                  alt="Uploaded image"
-                  width={500}
-                  height={500}
-                  className="max-h-[calc(100vh-200px)] max-w-full object-contain"
-                  style={{ width: 'auto', height: 'auto' }}
-                />
-                
-                {/* Error overlay for upload view */}
-                {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90 rounded-lg">
-                    <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
-                      <p className="text-lg font-medium text-red-800 mb-2">Upload Failed</p>
-                      <p className="text-sm text-red-600">{processingStatus.message}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Prompt Input */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-screen-md px-4">
-              <div className="relative flex items-center border border-[#D1D5DB] rounded-xl bg-white shadow-sm focus-within:shadow-md focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/20 transition-all duration-300">
-                <textarea
-                  ref={textareaRef}
-                  value={prompt}
-                  placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
-                  rows={1}
-                  className="flex-1 w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
-                  onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      if (prompt.trim() && !isProcessing) {
-                        handleSubmitPrompt()
-                      }
-                    }
-                  }}
-                />
-
-                <button
-                  onClick={handleSubmitPrompt}
-                  disabled={!prompt.trim() || isProcessing}
-                  className="w-9 h-9 sm:w-10 sm:h-10 mr-2 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isProcessing ? (
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {currentView === "output" && (
           <div className="relative flex flex-col h-full p-4">
             {/* Image with Navigation */}
             <div
               className="relative flex-1 flex items-center justify-center min-h-0"
-              onTouchStart={(e) => {
+              onTouchStart={generatedVariants.length > 1 ? (e) => {
                 const touch = e.touches[0]
                 e.currentTarget.dataset.startX = touch.clientX.toString()
-              }}
-              onTouchEnd={(e) => {
+              } : undefined}
+              onTouchEnd={generatedVariants.length > 1 ? (e) => {
                 const startX = Number.parseFloat(e.currentTarget.dataset.startX || "0")
                 const endX = e.changedTouches[0].clientX
                 const diff = startX - endX
@@ -676,66 +616,55 @@ export default function AIImageEditor() {
                     prevVariant()
                   }
                 }
-              }}
+              } : undefined}
             >
-              {/* Navigation Buttons */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={prevVariant}
-                className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute left-0 top-1/2 -translate-y-1/2 z-10"
-              >
-                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-              </Button>
+              {/* Navigation Buttons - Only show when there are multiple variants */}
+              {generatedVariants.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={prevVariant}
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute left-0 top-1/2 -translate-y-1/2 z-10"
+                >
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+                </Button>
+              )}
 
-              {/* Image */}
+              {/* Image Frame - Consistent dimensions and positioning */}
               <div className="bg-white h-full border border-[#D1D5DB] flex items-center justify-center overflow-hidden relative">
-                {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') ? (
-                  <div className="relative w-full h-full">
-                    {/* Current image (not faded for errors) */}
-                    <Image
-                      src={generatedVariants[currentVariant] || "/placeholder.svg"}
-                      alt="Current image"
-                      className="w-full h-full object-contain"
-                    />
-                    {/* Error overlay */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90">
-                      <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
-                        <p className="text-lg font-medium text-red-800 mb-2">Edit Failed</p>
-                        <p className="text-sm text-red-600">{processingStatus.message}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 ? (
-                  <div className="relative w-full h-full">
-                    {/* Faded input image */}
-                    <Image
-                      src={generatedVariants[currentVariant] || "/placeholder.svg"}
-                      alt="Input image (processing)"
-                      className="w-full h-full object-contain opacity-30"
-                    />
-                    {/* Loading overlay */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-white/80">
-                      <p className="text-lg font-medium text-[#1C1C1E]">{processingStatus.message}</p>
-                      {processingStatus.progress_percent > 0 && (
-                        <div className="w-full flex justify-center">
-                          <div className="w-48 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-[#4F46E5] h-2 rounded-full transition-all duration-300" 
-                              style={{ width: `${processingStatus.progress_percent}%` }}
-                            ></div>
-                          </div>
+                {/* Base Image - Always present for consistent frame */}
+                <Image
+                  src={generatedVariants[currentVariant] || "/placeholder.svg"}
+                  alt="Current image"
+                  className="w-full h-full object-contain cursor-pointer"
+                  onClick={() => setIsFullscreen(true)}
+                />
+                
+                {/* Processing Overlay - Only shows when processing */}
+                {generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-white/80">
+                    <p className="text-lg font-medium text-[#1C1C1E]">{processingStatus.message}</p>
+                    {processingStatus.progress_percent > 0 && (
+                      <div className="w-full flex justify-center">
+                        <div className="w-48 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-[#4F46E5] h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${processingStatus.progress_percent}%` }}
+                          ></div>
                         </div>
-                      )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Error Overlay - Only shows when there's an error */}
+                {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90">
+                    <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
+                      <p className="text-lg font-medium text-red-800 mb-2">Edit Failed</p>
+                      <p className="text-sm text-red-600">{processingStatus.message}</p>
                     </div>
                   </div>
-                ) : (
-                  <Image
-                    src={generatedVariants[currentVariant] || "/placeholder.svg"}
-                    alt="Generated image variant"
-                    className={`max-h-full max-w-full object-contain cursor-pointer`}
-                    onClick={() => setIsFullscreen(true)}
-                  />
                 )}
 
                 {/* Download Button - now positioned inside the image container */}
@@ -751,14 +680,16 @@ export default function AIImageEditor() {
 
 
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={nextVariant}
-                className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute right-0 top-1/2 -translate-y-1/2 z-10"
-              >
-                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-              </Button>
+              {generatedVariants.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={nextVariant}
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-white hover:bg-gray-50 shadow-md rounded-xl border border-[#D1D5DB] text-[#1C1C1E] absolute right-0 top-1/2 -translate-y-1/2 z-10"
+                >
+                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+                </Button>
+              )}
             </div>
 
             {/* Thumbnail Navigation */}
@@ -794,7 +725,7 @@ export default function AIImageEditor() {
                 <textarea
                   ref={textareaRef}
                   value={prompt}
-                  placeholder="Refine further: 'Make it brighter', 'Add sunset colors'"
+                  placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
                   rows={1}
                   className="flex-1 w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
                   onChange={(e) => setPrompt(e.target.value)}
@@ -831,25 +762,27 @@ export default function AIImageEditor() {
             onClick={() => setIsFullscreen(false)}
           >
             <div className="relative w-full h-full flex items-center justify-center">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  prevVariant()
-                }}
-                className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10"
-              >
-                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-              </Button>
+              {generatedVariants.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    prevVariant()
+                  }}
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10"
+                >
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+                </Button>
+              )}
 
               <div
                 className="relative w-full h-full flex items-center justify-center"
-                onTouchStart={(e) => {
+                onTouchStart={generatedVariants.length > 1 ? (e) => {
                   const touch = e.touches[0]
                   e.currentTarget.dataset.startX = touch.clientX.toString()
-                }}
-                onTouchEnd={(e) => {
+                } : undefined}
+                onTouchEnd={generatedVariants.length > 1 ? (e) => {
                   const startX = Number.parseFloat(e.currentTarget.dataset.startX || "0")
                   const endX = e.changedTouches[0].clientX
                   const diff = startX - endX
@@ -861,7 +794,7 @@ export default function AIImageEditor() {
                       prevVariant()
                     }
                   }
-                }}
+                } : undefined}
               >
                 <Image
                   src={generatedVariants[currentVariant] || "/placeholder.svg"}
@@ -871,17 +804,19 @@ export default function AIImageEditor() {
                 />
               </div>
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  nextVariant()
-                }}
-                className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10"
-              >
-                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-              </Button>
+              {generatedVariants.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    nextVariant()
+                  }}
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/20 absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10"
+                >
+                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+                </Button>
+              )}
 
               <button
                 onClick={() => setIsFullscreen(false)}
