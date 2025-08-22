@@ -667,15 +667,17 @@ export default function AIImageEditor() {
                   </div>
                 )}
 
-                {/* Download Button - now positioned inside the image container */}
-                <Button
-                  onClick={handleDownload}
-                  size="icon"
-                  className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
-                  title="Download Image"
-                >
-                  <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                </Button>
+                {/* Download Button - only show on generated/edited images (not the first/original image) */}
+                {currentVariant > 0 && (
+                  <Button
+                    onClick={handleDownload}
+                    size="icon"
+                    className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
+                    title="Download Image"
+                  >
+                    <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </Button>
+                )}
               </div>
 
 
