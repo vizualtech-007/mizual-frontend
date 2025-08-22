@@ -46,6 +46,10 @@ export default function AIImageEditor() {
   const [legalContent, setLegalContent] = useState("");
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [isMockAPIActive, setIsMockAPIActive] = useState(false);
+  
+  // File type accept strings
+  const ALL_IMAGE_TYPES = "image/*";
+  const STRICT_IMAGE_TYPES = "image/jpeg,image/jpg,image/jpe,image/jif,image/jfif,image/jfi,image/jpeg2000,image/jp2,image/j2k,image/jpf,image/jpx,image/jpm,image/mj2,image/jpegxl,image/jxl,image/jpegxr,image/jxr,image/hdp,image/wdp,image/png,image/apng,image/bmp,image/dib,image/tiff,image/tif,image/webp,image/heif,image/raw,image/dng,image/cr2,image/cr3,image/nef,image/nrw,image/arw,image/srf,image/sr2,image/orf,image/rw2,image/raf,image/rwl,image/3fr,image/erf,image/kdc,image/dcr,image/pef,image/srw,image/mef,image/mos,image/mrw,image/x3f,image/psd,image/psb,image/ico,image/icns,image/tga,image/icb,image/vda,image/vst,image/pcx,image/xbm,image/xpm,image/pbm,image/pgm,image/ppm,image/pnm,image/hdr,image/exr,image/dds,image/cur,image/fits";
 
   const ensureDataUrl = async (src: string): Promise<string> => {
     if (src.startsWith("data:")) return src;
@@ -580,7 +584,7 @@ export default function AIImageEditor() {
                 </div>
               </div>
             </footer>
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/jpe,image/jif,image/jfif,image/jfi,image/jpeg2000,image/jp2,image/j2k,image/jpf,image/jpx,image/jpm,image/mj2,image/jpegxl,image/jxl,image/jpegxr,image/jxr,image/hdp,image/wdp,image/png,image/apng,image/bmp,image/dib,image/tiff,image/tif,image/webp,image/heif,image/raw,image/dng,image/cr2,image/cr3,image/nef,image/nrw,image/arw,image/srf,image/sr2,image/orf,image/rw2,image/raf,image/rwl,image/3fr,image/erf,image/kdc,image/dcr,image/pef,image/srw,image/mef,image/mos,image/mrw,image/x3f,image/psd,image/psb,image/ico,image/icns,image/tga,image/icb,image/vda,image/vst,image/pcx,image/xbm,image/xpm,image/pbm,image/pgm,image/ppm,image/pnm,image/hdr,image/exr,image/dds,image/cur,image/fits" onChange={handleFileUpload} className="hidden" />
+            <input ref={fileInputRef} type="file" accept={process.env.NEXT_PUBLIC_STRICT_FILE_TYPES === 'true' ? STRICT_IMAGE_TYPES : ALL_IMAGE_TYPES} onChange={handleFileUpload} className="hidden" />
             <Dialog open={isLegalDialogOpen} onOpenChange={setIsLegalDialogOpen}>
               <DialogContent className="prose lg:prose-xl p-8">
                 <DialogHeader>
