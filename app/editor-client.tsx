@@ -352,14 +352,26 @@ export default function AIImageEditor() {
     setCurrentVariant((prev) => (prev - 1 + generatedVariants.length) % generatedVariants.length)
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (generatedVariants.length > 0) {
-      const link = document.createElement("a")
-      link.href = generatedVariants[currentVariant]
-      link.download = "edited-image.png"
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      try {
+        const imageUrl = generatedVariants[currentVariant];
+        
+        // Convert to data URL if it's not already one
+        const dataUrl = await ensureDataUrl(imageUrl);
+        
+        // Create download link
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = "edited-image.png";
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+      } catch (error) {
+        console.error('Download failed:', error);
+      }
     }
   }
 
