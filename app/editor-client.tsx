@@ -14,9 +14,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+
 import { createMockFetch, shouldUseMockAPI } from "@/lib/mock-api"
 
 type ViewState = "home" | "output"
+
 type LegalDocument = "Privacy Policy" | "Terms of Condition" | "Terms of Use"
 
 export default function AIImageEditor() {
@@ -45,11 +47,13 @@ export default function AIImageEditor() {
   const [isLegalDialogOpen, setIsLegalDialogOpen] = useState(false);
   const [legalContent, setLegalContent] = useState("");
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+
   const [isMockAPIActive, setIsMockAPIActive] = useState(false);
   
   // File type accept strings
   const ALL_IMAGE_TYPES = "image/*";
   const STRICT_IMAGE_TYPES = "image/jpeg,image/jpg,image/jpe,image/jif,image/jfif,image/jfi,image/jpeg2000,image/jp2,image/j2k,image/jpf,image/jpx,image/jpm,image/mj2,image/jpegxl,image/jxl,image/jpegxr,image/jxr,image/hdp,image/wdp,image/png,image/apng,image/bmp,image/dib,image/tiff,image/tif,image/webp,image/heif,image/raw,image/dng,image/cr2,image/cr3,image/nef,image/nrw,image/arw,image/srf,image/sr2,image/orf,image/rw2,image/raf,image/rwl,image/3fr,image/erf,image/kdc,image/dcr,image/pef,image/srw,image/mef,image/mos,image/mrw,image/x3f,image/psd,image/psb,image/ico,image/icns,image/tga,image/icb,image/vda,image/vst,image/pcx,image/xbm,image/xpm,image/pbm,image/pgm,image/ppm,image/pnm,image/hdr,image/exr,image/dds,image/cur,image/fits";
+
 
   const ensureDataUrl = async (src: string): Promise<string> => {
     if (src.startsWith("data:")) return src;
@@ -214,6 +218,7 @@ export default function AIImageEditor() {
     }
 
     if (!response || !response.ok) {
+
       // Handle upload errors (like unsupported image types)
       let errorMessage = 'Upload failed. Please try again.';
       
@@ -396,6 +401,7 @@ export default function AIImageEditor() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+
       if (currentView === "output" && document.activeElement?.tagName !== 'TEXTAREA' && generatedVariants.length > 1) {
         if (e.key === 'ArrowLeft') {
           e.preventDefault()
@@ -441,11 +447,13 @@ export default function AIImageEditor() {
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="text-lg sm:text-xl font-semibold text-[#1C1C1E]">Mizual</span>
+
           {isMockAPIActive && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
               Mock API
             </span>
           )}
+          
         </div>
         {currentView === "output" && (
           <Button
@@ -518,9 +526,11 @@ export default function AIImageEditor() {
                       onClick={() => {
                         setUploadedImage(useCase.beforeImage);
                         setPrompt(useCase.prompt);
+
                         setGeneratedVariants([useCase.beforeImage]);
                         setCurrentVariant(0);
                         setCurrentView("output");
+
                       }}
                       className="px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs sm:text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
                     >
@@ -596,7 +606,9 @@ export default function AIImageEditor() {
                 </div>
               </div>
             </footer>
+
             <input ref={fileInputRef} type="file" accept={process.env.NEXT_PUBLIC_STRICT_FILE_TYPES === 'true' ? STRICT_IMAGE_TYPES : ALL_IMAGE_TYPES} onChange={handleFileUpload} className="hidden" />
+
             <Dialog open={isLegalDialogOpen} onOpenChange={setIsLegalDialogOpen}>
               <DialogContent className="prose lg:prose-xl p-8">
                 <DialogHeader>
@@ -609,14 +621,14 @@ export default function AIImageEditor() {
         )}
 
 
-
-
         {currentView === "output" && (
           <div className="relative flex flex-col h-full p-4">
             {/* Image with Navigation */}
             <div
               className="relative flex-1 flex items-center justify-center min-h-0"
+
               onTouchStart={generatedVariants.length > 1 ? (e) => {
+
                 const touch = e.touches[0]
                 e.currentTarget.dataset.startX = touch.clientX.toString()
               } : undefined}
@@ -634,6 +646,7 @@ export default function AIImageEditor() {
                 }
               } : undefined}
             >
+
               {/* Navigation Buttons - Only show when there are multiple variants */}
               {generatedVariants.length > 1 && (
                 <Button
@@ -743,7 +756,9 @@ export default function AIImageEditor() {
                 <textarea
                   ref={textareaRef}
                   value={prompt}
+
                   placeholder="Describe your edit: 'Blur background', 'Add glasses', 'Fix lighting'"
+
                   rows={1}
                   className="flex-1 w-full resize-none overflow-auto max-h-[45vh] min-h-[48px] sm:min-h-[52px] text-sm sm:text-base lg:text-lg px-3 sm:px-4 py-3 bg-transparent leading-normal focus:outline-none text-[#1C1C1E]"
                   onChange={(e) => setPrompt(e.target.value)}
@@ -780,6 +795,7 @@ export default function AIImageEditor() {
             onClick={() => setIsFullscreen(false)}
           >
             <div className="relative w-full h-full flex items-center justify-center">
+
               {generatedVariants.length > 1 && (
                 <Button
                   variant="ghost"
@@ -797,6 +813,7 @@ export default function AIImageEditor() {
               <div
                 className="relative w-full h-full flex items-center justify-center"
                 onTouchStart={generatedVariants.length > 1 ? (e) => {
+
                   const touch = e.touches[0]
                   e.currentTarget.dataset.startX = touch.clientX.toString()
                 } : undefined}
@@ -821,6 +838,7 @@ export default function AIImageEditor() {
                   objectFit="contain"
                 />
               </div>
+
 
               {generatedVariants.length > 1 && (
                 <Button
