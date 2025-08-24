@@ -15,7 +15,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-import { createMockFetch, shouldUseMockAPI } from "@/lib/mock-api"
 
 type ViewState = "home" | "output"
 
@@ -48,11 +47,9 @@ export default function AIImageEditor() {
   const [legalContent, setLegalContent] = useState("");
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
 
-  const [isMockAPIActive, setIsMockAPIActive] = useState(false);
   
-  // File type accept strings
-  const ALL_IMAGE_TYPES = "image/*";
-  const STRICT_IMAGE_TYPES = "image/jpeg,image/jpg,image/jpe,image/jif,image/jfif,image/jfi,image/jpeg2000,image/jp2,image/j2k,image/jpf,image/jpx,image/jpm,image/mj2,image/jpegxl,image/jxl,image/jpegxr,image/jxr,image/hdp,image/wdp,image/png,image/apng,image/bmp,image/dib,image/tiff,image/tif,image/webp,image/heif,image/raw,image/dng,image/cr2,image/cr3,image/nef,image/nrw,image/arw,image/srf,image/sr2,image/orf,image/rw2,image/raf,image/rwl,image/3fr,image/erf,image/kdc,image/dcr,image/pef,image/srw,image/mef,image/mos,image/mrw,image/x3f,image/psd,image/psb,image/ico,image/icns,image/tga,image/icb,image/vda,image/vst,image/pcx,image/xbm,image/xpm,image/pbm,image/pgm,image/ppm,image/pnm,image/hdr,image/exr,image/dds,image/cur,image/fits";
+  // Supported image formats from environment or default
+  const SUPPORTED_IMAGE_TYPES = process.env.NEXT_PUBLIC_SUPPORTED_IMAGE_TYPES || "image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif";
 
 
   const ensureDataUrl = async (src: string): Promise<string> => {
@@ -417,26 +414,6 @@ export default function AIImageEditor() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [currentView, generatedVariants.length])
 
-  // Initialize mock API when running locally
-  useEffect(() => {
-    if (shouldUseMockAPI()) {
-      // console.log('🔧 Mock API enabled');
-      setIsMockAPIActive(true);
-      
-      // Store original fetch
-      const originalFetch = window.fetch;
-      
-      // Create and set mock fetch
-      const mockFetch = createMockFetch();
-      window.fetch = mockFetch;
-      
-      // Cleanup function to restore original fetch
-      return () => {
-        window.fetch = originalFetch;
-        setIsMockAPIActive(false);
-      };
-    }
-  }, [])
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-[#F8F9FA] flex flex-col">
@@ -448,11 +425,6 @@ export default function AIImageEditor() {
           </div>
           <span className="text-lg sm:text-xl font-semibold text-[#1C1C1E]">Mizual</span>
 
-          {isMockAPIActive && (
-            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-medium">
-              Mock API
-            </span>
-          )}
           
         </div>
         {currentView === "output" && (
@@ -555,24 +527,22 @@ export default function AIImageEditor() {
                       </h3>
                       <div className="flex gap-2 sm:gap-3 w-full">
                         <div className="relative flex-1 aspect-square rounded-lg overflow-hidden shadow-sm border border-[#D1D5DB]">
-                          <Image
+                          <img
                             src={useCase.beforeImage || "/placeholder.svg"}
                             alt={`${useCase.title} before`}
-                            layout="fill"
-                            objectFit="cover"
-                            className="group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
                           />
                           <span className="absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded">
                             Before
                           </span>
                         </div>
                         <div className="relative flex-1 aspect-square rounded-lg overflow-hidden shadow-sm border border-[#D1D5DB]">
-                          <Image
+                          <img
                             src={useCase.afterImage || "/placeholder.svg"}
                             alt={`${useCase.title} after`}
-                            layout="fill"
-                            objectFit="cover"
-                            className="group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
                           />
                           <span className="absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded">
                             After
@@ -607,7 +577,7 @@ export default function AIImageEditor() {
               </div>
             </footer>
 
-            <input ref={fileInputRef} type="file" accept={process.env.NEXT_PUBLIC_STRICT_FILE_TYPES === 'true' ? STRICT_IMAGE_TYPES : ALL_IMAGE_TYPES} onChange={handleFileUpload} className="hidden" />
+            <input ref={fileInputRef} type="file" accept={SUPPORTED_IMAGE_TYPES} onChange={handleFileUpload} className="hidden" />
 
             <Dialog open={isLegalDialogOpen} onOpenChange={setIsLegalDialogOpen}>
               <DialogContent className="prose lg:prose-xl p-8">
@@ -659,54 +629,59 @@ export default function AIImageEditor() {
                 </Button>
               )}
 
-              {/* Image Frame - Consistent dimensions and positioning */}
-              <div className="bg-white h-full border border-[#D1D5DB] flex items-center justify-center overflow-hidden relative">
-                {/* Base Image - Always present for consistent frame */}
-                <Image
-                  src={generatedVariants[currentVariant] || "/placeholder.svg"}
-                  alt="Current image"
-                  className="w-full h-full object-contain cursor-pointer"
-                  onClick={() => setIsFullscreen(true)}
-                />
-                
-                {/* Processing Overlay - Only shows when processing */}
-                {generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-white/80">
-                    <p className="text-lg font-medium text-[#1C1C1E]">{processingStatus.message}</p>
-                    {processingStatus.progress_percent > 0 && (
-                      <div className="w-full flex justify-center">
-                        <div className="w-48 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-[#4F46E5] h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${processingStatus.progress_percent}%` }}
-                          ></div>
+              {/* Image Frame - Border wraps around actual image */}
+              <div className="flex justify-center w-full max-h-[70vh]">
+                <div className="relative border border-[#D1D5DB] overflow-hidden">
+                  <Image
+                    src={generatedVariants[currentVariant] || "/placeholder.svg"}
+                    alt="Current image"
+                    width={800}
+                    height={600}
+                    className="object-contain cursor-pointer hover:scale-[1.02] transition-transform duration-200 max-w-[90vw] max-h-[70vh] w-auto h-auto"
+                    onClick={() => setIsFullscreen(true)}
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 800px"
+                    priority={currentVariant === 0}
+                  />
+                  
+                  {/* Processing Overlay - Only shows when processing */}
+                  {generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-white/80">
+                      <p className="text-lg font-medium text-[#1C1C1E]">{processingStatus.message}</p>
+                      {processingStatus.progress_percent > 0 && (
+                        <div className="w-full flex justify-center">
+                          <div className="w-48 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-[#4F46E5] h-2 rounded-full transition-all duration-300" 
+                              style={{ width: `${processingStatus.progress_percent}%` }}
+                            ></div>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Error Overlay - Only shows when there's an error */}
-                {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90">
-                    <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
-                      <p className="text-lg font-medium text-red-800 mb-2">Edit Failed</p>
-                      <p className="text-sm text-red-600">{processingStatus.message}</p>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
+                  
+                  {/* Error Overlay - Only shows when there's an error */}
+                  {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90">
+                      <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
+                        <p className="text-lg font-medium text-red-800 mb-2">Edit Failed</p>
+                        <p className="text-sm text-red-600">{processingStatus.message}</p>
+                      </div>
+                    </div>
+                  )}
 
-                {/* Download Button - only show on generated/edited images (not the first/original image) */}
-                {currentVariant > 0 && (
-                  <Button
-                    onClick={handleDownload}
-                    size="icon"
-                    className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
-                    title="Download Image"
-                  >
-                    <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </Button>
-                )}
+                  {/* Download Button - only show on generated/edited images (not the first/original image) */}
+                  {currentVariant > 0 && (
+                    <Button
+                      onClick={handleDownload}
+                      size="icon"
+                      className="absolute bottom-4 right-4 w-10 h-10 sm:w-12 sm:h-12 bg-[#4F46E5] hover:bg-[#6366F1] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 z-20"
+                      title="Download Image"
+                    >
+                      <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
 
@@ -739,11 +714,13 @@ export default function AIImageEditor() {
                     <Image
                       src={variant}
                       alt={`Variant ${index + 1}`}
-                      className={`w-full h-full object-cover ${
+                      fill
+                      className={`object-cover transition-opacity duration-200 ${
                         variant === baseImageForEdit && processingStatus && index === generatedVariants.length - 1 
                           ? "opacity-50" 
                           : "opacity-100"
                       }`}
+                      sizes="(max-width: 640px) 60px, (max-width: 768px) 70px, 80px"
                     />
                   </button>
                 ))}
@@ -834,8 +811,10 @@ export default function AIImageEditor() {
                 <Image
                   src={generatedVariants[currentVariant] || "/placeholder.svg"}
                   alt="Generated image variant - Fullscreen"
-                  layout="fill"
-                  objectFit="contain"
+                  fill
+                  className="object-contain"
+                  sizes="100vw"
+                  priority
                 />
               </div>
 

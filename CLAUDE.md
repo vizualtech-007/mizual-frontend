@@ -2,6 +2,52 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with the Mizual frontend codebase.
 
+## ⚠️ CRITICAL DEVELOPMENT REQUIREMENTS
+
+### 🎯 Device & Browser Compatibility (MANDATORY)
+When developing ANY component or feature, ensure compatibility across:
+
+**Target Devices:**
+- 📱 **Mobile**: iPhone (all sizes), Android phones (all screen sizes)
+- 📱 **Tablets**: iPad (all sizes), Android tablets (all screen sizes) 
+- 💻 **Laptops/Desktop**: MacBook (all sizes), Windows laptops, desktop computers
+
+**Target Browsers:**
+- 🌐 **Safari** (iOS & macOS) - Primary focus for Apple devices
+- 🌐 **Google Chrome** (All platforms) - Primary desktop browser
+- 🌐 **Microsoft Edge** (Windows) - Windows default browser
+- 🌐 **Firefox** (All platforms) - Privacy-focused users
+- 🌐 **Other Chromium browsers** (Brave, Opera, etc.)
+
+**Responsive Design Requirements:**
+- Use Tailwind CSS responsive breakpoints: `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
+- Test touch interactions on mobile/tablet devices
+- Ensure minimum 44px tap targets for mobile accessibility
+- Implement swipe gestures where appropriate
+- Test keyboard navigation on desktop
+
+### ⚡ Performance & Latency Optimization (MANDATORY)
+Every piece of code MUST be optimized for performance:
+
+**Frontend Performance:**
+- **Image Handling**: Use `loading="lazy"` for all images, optimize formats (WebP, AVIF)
+- **Bundle Size**: Minimize JavaScript bundle size, use dynamic imports for large components
+- **React Optimization**: Use `React.memo()`, `useCallback()`, `useMemo()` for expensive operations
+- **API Calls**: Implement proper loading states, error boundaries, and retry logic
+- **Caching**: Leverage browser caching, avoid unnecessary re-renders
+
+**Latency Optimization:**
+- **API Integration**: Implement request batching, debouncing for user inputs
+- **Real-time Updates**: Efficient polling intervals (2-second default), cleanup on unmount
+- **Network Handling**: Handle offline states, slow connections gracefully
+- **Progressive Loading**: Show content progressively, avoid blocking the main thread
+
+### 📱 Mobile-First Development Approach
+- Start with mobile design, then enhance for larger screens
+- Use responsive typography: `text-sm sm:text-base md:text-lg`
+- Implement touch-friendly navigation and interactions
+- Test on actual devices, not just browser dev tools
+
 **Last Updated**: August 24, 2025
 **Framework**: Next.js 14 with TypeScript
 **Deployment**: Vercel
@@ -16,10 +62,11 @@ Mizual Frontend is a modern, responsive web application built with Next.js that 
 - **AI-Powered Image Editing**: Natural language prompts for image modifications
 - **Real-time Progress Tracking**: Live status updates during processing
 - **Edit Chaining**: Ability to perform multiple sequential edits on the same image
-- **Responsive Design**: Mobile-first approach with touch gestures
+- **Cross-Platform Responsive Design**: Optimized for mobile, tablet, and desktop across all browsers
 - **Image Gallery Navigation**: Keyboard and touch navigation between edit variants
+- **Multi-Format Support**: JPEG, PNG, WebP, GIF, AVIF image formats
 - **Download Functionality**: Direct image download with format preservation
-- **Mock API Mode**: Local development support with simulated responses
+- **Performance Optimized**: Lazy loading, efficient rendering, optimized bundle size
 
 ## Architecture Overview
 
@@ -56,7 +103,6 @@ mizual-frontend/
 │   └── theme-provider.tsx         # Theme context (unused)
 ├── lib/
 │   ├── utils.ts                   # Utility functions (cn, clsx)
-│   └── mock-api.ts                # Development mock API service
 ├── public/
 │   ├── images/                    # Example images and use cases
 │   │   ├── mizual-acne.webp       # Before/after examples
@@ -113,10 +159,11 @@ const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null)
 #### Key Features
 
 **Image Upload & Validation**:
-- Supports drag & drop and click-to-upload
-- Configurable file type restrictions via `NEXT_PUBLIC_STRICT_FILE_TYPES`
+- Supports drag & drop and click-to-upload across all devices and browsers
+- **Supported formats**: JPEG, PNG, WebP, GIF, AVIF (configurable via `NEXT_PUBLIC_SUPPORTED_IMAGE_TYPES`)
 - Base64 encoding for API transmission
-- Client-side image format detection
+- Optimized for performance with lazy loading and efficient rendering
+- Cross-browser compatibility (Safari, Chrome, Edge, Firefox)
 
 **Processing Pipeline**:
 1. Image upload and validation
@@ -131,11 +178,13 @@ const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null)
 - Visual navigation between variants
 - UUID-based edit identification
 
-**Responsive Design**:
-- Mobile-first approach with responsive breakpoints
-- Touch gesture support (swipe navigation)
-- Keyboard shortcuts (arrow keys)
-- Adaptive layout for different screen sizes
+**Cross-Platform Responsive Design**:
+- **Mobile-first approach** with Tailwind responsive breakpoints (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`)
+- **Touch gesture support** (swipe navigation) for mobile and tablet devices
+- **Keyboard shortcuts** (arrow keys) optimized for desktop/laptop usage
+- **Adaptive layouts** for iPhone, Android, iPad, tablets, MacBook, and desktop
+- **44px minimum tap targets** for mobile accessibility compliance
+- **Cross-browser optimization** for Safari, Chrome, Edge, Firefox compatibility
 
 ## API Integration
 
@@ -143,10 +192,19 @@ const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null)
 
 ```typescript
 // Environment Variables
-NEXT_PUBLIC_API_URL: string           // Backend API URL
-NEXT_PUBLIC_ENVIRONMENT: string       // Environment name
-NEXT_PUBLIC_USE_MOCK_API: boolean     // Enable mock API for development
-NEXT_PUBLIC_STRICT_FILE_TYPES: boolean // Strict file type validation
+NEXT_PUBLIC_API_URL: string                    // Backend API URL
+NEXT_PUBLIC_ENVIRONMENT: string                // Environment name (development/production)
+NEXT_PUBLIC_SUPPORTED_IMAGE_TYPES: string      // Supported image MIME types (comma-separated)
+```
+
+**Current Environment Setup (.env.local):**
+```env
+# Frontend Environment Variables
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_ENVIRONMENT=development
+
+# Supported image formats (comma-separated MIME types)
+NEXT_PUBLIC_SUPPORTED_IMAGE_TYPES=image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif
 ```
 
 ### API Endpoints Integration
@@ -197,46 +255,6 @@ type ProcessingStatus = {
 }
 ```
 
-## Mock API System
-
-### Purpose
-The mock API system enables local development without requiring a backend server, providing realistic simulation of the editing process.
-
-### Implementation (`lib/mock-api.ts`)
-
-#### MockAPIService Class
-
-```typescript
-class MockAPIService {
-  private mockImages: string[]      // Pool of result images
-  private processingJobs: Map       // Active processing jobs
-  
-  async mockEditImage(prompt, image, parentUuid): Promise<any>
-  async mockEditStatus(editId): Promise<any>
-  private startMockProcessing(editId, prompt): void
-}
-```
-
-#### Key Features
-
-**Realistic Simulation**:
-- 2-5 second processing times
-- Progressive status updates
-- Random result image selection
-- Stage-based progress reporting
-
-**Development Integration**:
-- Automatic activation via `NEXT_PUBLIC_USE_MOCK_API=true`
-- Fetch API interception
-- No backend dependency
-- Visual indicator when active
-
-**Processing Stages**:
-1. `initializing` (0-25%)
-2. `analyzing` (25-50%)
-3. `processing` (50-75%)
-4. `finalizing` (75-100%)
-
 ## UI Components & Design System
 
 ### Design Tokens
@@ -274,13 +292,15 @@ Labels: text-xs to text-sm
 
 #### Custom Components
 
-**ImageFrame**: Responsive image container with aspect ratio preservation
+**ImageFrame**: Responsive image container with border wrapping
 ```typescript
 // Features:
-- Consistent dimensions across variants
-- Zoom/fullscreen functionality
-- Processing overlays
-- Download button positioning
+- Border wraps around actual image dimensions (no fixed white background)
+- Hybrid approach: regular <img> for base64, Next.js Image for static files
+- Responsive sizing with viewport constraints (max-w-[90vw] max-h-[70vh])
+- Next.js Image requires proper width/height props (width={800} height={600})
+- Processing overlays and download button positioning within image bounds
+- No hardcoded aspect ratios - images maintain natural proportions
 ```
 
 **NavigationButtons**: Previous/next variant navigation
@@ -300,6 +320,57 @@ Labels: text-xs to text-sm
 - Responsive sizing (12-16px thumbnails)
 - Processing state indication
 ```
+
+## Image Layout & Display Best Practices
+
+### Critical Layout Requirements
+
+**Next.js Image Component Requirements:**
+```typescript
+// ALWAYS provide width and height for Next.js Image components
+<Image
+  src={imageUrl}
+  width={800}        // Required: prevents layout shifts
+  height={600}       // Required: enables optimization
+  className="w-auto h-auto max-w-[90vw] max-h-[70vh]"  // Responsive constraints
+  sizes="(max-width: 768px) 100vw, 800px"              // Responsive loading
+/>
+```
+
+**Border Wrapping Pattern:**
+```typescript
+// Border should wrap around actual image, not fixed container
+<div className="flex justify-center w-full">
+  <div className="relative border border-[#D1D5DB] overflow-hidden">
+    <Image /> {/* Image determines container size */}
+  </div>
+</div>
+
+// AVOID: Fixed aspect ratio containers with white backgrounds
+// AVOID: <div style={{ aspectRatio: '4/3' }} className="bg-white">
+```
+
+**Layout Container Structure:**
+```typescript
+// Maintain flex layout to prevent vertical scrolling
+<div className="relative flex flex-col h-full p-4">           // Main container
+  <div className="relative flex-1 flex items-center justify-center min-h-0">  // Image area
+    {/* Image with navigation buttons */}
+  </div>
+  <div className="flex-shrink-0">  // Thumbnails - always at bottom
+    {/* Thumbnail navigation */}
+  </div>
+  <div className="flex-shrink-0">  // Prompt input - always at bottom
+    {/* Prompt input area */}
+  </div>
+</div>
+```
+
+**Responsive Constraints:**
+- Use `max-w-[90vw] max-h-[70vh]` for proper viewport fitting
+- Ensure `flex-1` and `min-h-0` on image containers to prevent overflow
+- Never use fixed aspect ratios that force white backgrounds
+- Always test layout changes across different image aspect ratios
 
 ## User Experience Features
 
@@ -396,11 +467,10 @@ npm run lint
 #### Development Environment Variables
 
 ```env
-# .env.local
+# .env.local (Development)
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_ENVIRONMENT=development
-NEXT_PUBLIC_USE_MOCK_API=true
-NEXT_PUBLIC_STRICT_FILE_TYPES=false
+NEXT_PUBLIC_SUPPORTED_IMAGE_TYPES=image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif
 ```
 
 #### Production Environment Variables
@@ -409,8 +479,7 @@ NEXT_PUBLIC_STRICT_FILE_TYPES=false
 # Vercel Production
 NEXT_PUBLIC_API_URL=https://api.mizual.ai
 NEXT_PUBLIC_ENVIRONMENT=production
-NEXT_PUBLIC_USE_MOCK_API=false
-NEXT_PUBLIC_STRICT_FILE_TYPES=true
+NEXT_PUBLIC_SUPPORTED_IMAGE_TYPES=image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif
 ```
 
 ### Build Configuration
@@ -482,51 +551,51 @@ const nextConfig = {
 
 ### Environment Management
 
-#### Production Environment
-```env
-NEXT_PUBLIC_API_URL=https://api.mizual.ai
-NEXT_PUBLIC_ENVIRONMENT=production
-NEXT_PUBLIC_USE_MOCK_API=false
-NEXT_PUBLIC_STRICT_FILE_TYPES=true
-```
-
-#### Preview Environment
-```env
-NEXT_PUBLIC_API_URL=https://dev-api.mizual.ai
-NEXT_PUBLIC_ENVIRONMENT=preview
-NEXT_PUBLIC_USE_MOCK_API=false
-NEXT_PUBLIC_STRICT_FILE_TYPES=false
-```
 
 ## Performance Optimization
 
-### Core Web Vitals
+### ⚡ MANDATORY Performance Requirements
+All code MUST meet these performance standards across ALL target devices and browsers:
 
-#### Current Metrics
-- **First Contentful Paint (FCP)**: ~1.2s
-- **Largest Contentful Paint (LCP)**: ~1.8s
-- **Cumulative Layout Shift (CLS)**: <0.1
-- **First Input Delay (FID)**: <100ms
+#### Core Web Vitals Targets
+- **First Contentful Paint (FCP)**: <1.5s (current: ~1.2s)
+- **Largest Contentful Paint (LCP)**: <2.5s (current: ~1.8s)
+- **Cumulative Layout Shift (CLS)**: <0.1 (current: <0.1)
+- **First Input Delay (FID)**: <100ms (current: <100ms)
 
-#### Optimization Strategies
+#### Cross-Device Performance Standards
+- **Mobile (3G/4G)**: App must load and be interactive within 3 seconds
+- **Desktop/Laptop**: Sub-second interactions for all UI operations
+- **Tablet**: Smooth 60fps animations and touch interactions
+- **Low-end devices**: Graceful degradation without blocking UI
+
+#### Optimization Strategies (MANDATORY Implementation)
 
 **Bundle Size Optimization**:
-- Dynamic imports for large components
-- Tree shaking for unused code
-- Code splitting by route
-- Lazy loading for images
+- Dynamic imports for large components (`React.lazy()`)
+- Tree shaking for unused code elimination
+- Code splitting by route and feature
+- **Image optimization**: `loading="lazy"`, WebP/AVIF formats, proper sizing
 
 **Runtime Performance**:
-- React.memo for stable components
-- useCallback for stable functions
-- Virtual scrolling (not implemented)
-- Debounced user inputs
+- `React.memo()` for ALL stable components
+- `useCallback()` and `useMemo()` for expensive operations
+- Debounced user inputs (300ms default)
+- Efficient re-rendering patterns
+- Virtual scrolling for large lists
 
-**Loading Performance**:
-- SSG for static pages
-- ISR for dynamic content (not used)
-- Preloading for critical resources
-- Service worker (not implemented)
+**Network & API Optimization**:
+- Request batching and deduplication
+- Proper caching strategies (browser + API)
+- Offline fallback states
+- Progressive loading patterns
+- Retry logic with exponential backoff
+
+**Cross-Browser Performance**:
+- Safari-specific optimizations (iOS performance)
+- Chrome V8 engine optimization
+- Edge compatibility testing
+- Firefox performance profiling
 
 ### Image Handling
 
@@ -541,9 +610,11 @@ NEXT_PUBLIC_STRICT_FILE_TYPES=false
 ```
 
 #### Format Support
-- **Supported**: JPEG, PNG, WebP, BMP, TIFF
-- **Blocked**: HEIC, AVIF, GIF (configurable)
-- **Fallback**: Graceful error handling for unsupported formats
+- **Currently Supported**: JPEG, PNG, WebP, GIF, AVIF
+- **Cross-browser compatibility**: Optimized for Safari, Chrome, Edge, Firefox
+- **Configuration**: Formats defined via `NEXT_PUBLIC_SUPPORTED_IMAGE_TYPES` environment variable
+- **Performance**: Regular `<img>` tags used instead of Next.js Image for base64 support
+- **Fallback**: Graceful error handling for unsupported formats across all browsers
 
 #### Memory Management
 ```typescript
@@ -627,11 +698,18 @@ npm run dev
 
 ### Development Tools
 
-#### Browser DevTools
-- **Network Tab**: API request monitoring
-- **Console**: Error logging and debugging
-- **Performance**: Runtime performance analysis
-- **Application**: Local storage and service workers
+#### Cross-Browser Development Tools
+- **Chrome DevTools**: Primary development and performance analysis
+- **Safari Web Inspector**: iOS/macOS compatibility testing
+- **Firefox Developer Tools**: Cross-platform performance verification
+- **Edge DevTools**: Windows compatibility validation
+
+**Key Testing Areas:**
+- **Network Tab**: API request monitoring across browsers
+- **Console**: Error logging and debugging consistency
+- **Performance**: Runtime analysis on each target browser
+- **Responsive Design**: Device simulation and real device testing
+- **Accessibility**: Screen reader and keyboard navigation testing
 
 #### VS Code Extensions
 - **ES7+ React/Redux/React-Native snippets**
@@ -701,14 +779,6 @@ console.log('Current State:', { currentView, generatedVariants });
 
 ## Important Notes
 
-### Mock API Removal Plan
-The mock API system (`lib/mock-api.ts`) is intended for development only and should be removed before production deployment. The removal plan:
-
-1. **Phase 1**: Disable mock API in production builds
-2. **Phase 2**: Remove mock API code entirely
-3. **Phase 3**: Clean up related environment variables
-4. **Phase 4**: Update documentation
-
 ### Security Considerations
 
 #### Client-Side Security
@@ -725,11 +795,12 @@ The mock API system (`lib/mock-api.ts`) is intended for development only and sho
 
 ### Browser Support
 
-#### Target Browsers
-- **Chrome**: 90+ (primary)
-- **Firefox**: 88+ (secondary)
-- **Safari**: 14+ (secondary)
-- **Edge**: 90+ (secondary)
+#### Target Browsers (MANDATORY Support)
+- **Safari**: 14+ (iOS & macOS) - **PRIMARY** for Apple ecosystem
+- **Chrome**: 90+ (All platforms) - **PRIMARY** for desktop/Android
+- **Edge**: 90+ (Windows) - **REQUIRED** for Windows users
+- **Firefox**: 88+ (All platforms) - **REQUIRED** for privacy-focused users
+- **Other Chromium**: Brave, Opera, etc. - **SECONDARY** but should work
 
 #### Polyfills & Fallbacks
 - **FileReader API**: Native support required
@@ -744,4 +815,4 @@ The mock API system (`lib/mock-api.ts`) is intended for development only and sho
 - API integration changes
 - Performance optimizations are implemented
 - User experience improvements are made
-- Mock API system is removed
+- Cross-browser compatibility testing is completed
