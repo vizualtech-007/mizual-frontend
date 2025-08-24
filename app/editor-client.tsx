@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import Image from "next/image"
+import NextImage from "next/image"
 import { Upload, ArrowLeft, ChevronLeft, ChevronRight, Download, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,7 @@ export default function AIImageEditor() {
   const [currentView, setCurrentView] = useState<ViewState>("home")
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [currentVariant, setCurrentVariant] = useState(0)
+  const currentVariantRef = useRef(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [prompt, setPrompt] = useState("")
@@ -31,6 +32,12 @@ export default function AIImageEditor() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [generatedVariants, setGeneratedVariants] = useState<string[]>([])
   const [editId, setEditId] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState<{[key: string]: boolean}>({})
+  const [containerDimensions, setContainerDimensions] = useState<{width: number, height: number} | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [imageLoadStates, setImageLoadStates] = useState<{[key: string]: 'loading' | 'loaded' | 'error'}>({})
+  const [originalFileName, setOriginalFileName] = useState<string>('')
   const [baseImageForEdit, setBaseImageForEdit] = useState<string | null>(null);
   const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
@@ -77,6 +84,24 @@ export default function AIImageEditor() {
     return 0;
   };
 
+  const handleImageLoad = (imageKey: string) => {
+    setImageLoadStates(prev => ({ ...prev, [imageKey]: 'loaded' }))
+  }
+
+  const handleImageError = (imageKey: string) => {
+    setImageLoadStates(prev => ({ ...prev, [imageKey]: 'error' }))
+  }
+
+  const handleImageLoadStart = (imageKey: string) => {
+    setImageLoadStates(prev => ({ ...prev, [imageKey]: 'loading' }))
+  }
+
+  const retryImageLoad = (imageKey: string, imgElement: HTMLImageElement, originalSrc: string) => {
+    handleImageLoadStart(imageKey)
+    // Add timestamp to bypass cache
+    imgElement.src = `${originalSrc}?retry=${Date.now()}`
+  }
+
   const useCases = [
     {
       title: "Face Retouching",
@@ -115,6 +140,10 @@ export default function AIImageEditor() {
       setBaseImageForEdit(null)
       isSubmittingRef.current = false
       
+      // Store original filename without extension
+      const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '')
+      setOriginalFileName(nameWithoutExtension)
+      
       const reader = new FileReader()
       reader.onload = (e) => {
         const imageData = e.target?.result as string
@@ -129,10 +158,29 @@ export default function AIImageEditor() {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    // Only set to false if we're leaving the drop zone entirely
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX
+    const y = e.clientY
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragOver(false)
+    }
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    setIsDragOver(false) // Reset drag state
     const file = e.dataTransfer.files[0]
     if (file && file.type.startsWith("image/")) {
       // Reset all processing state when uploading new image
@@ -142,6 +190,10 @@ export default function AIImageEditor() {
       setCurrentEditUuid(null)
       setBaseImageForEdit(null)
       isSubmittingRef.current = false
+      
+      // Store original filename without extension
+      const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '')
+      setOriginalFileName(nameWithoutExtension)
       
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -166,6 +218,10 @@ export default function AIImageEditor() {
     if (!prompt.trim() || !sourceImage) return;
 
     
+    // Add a blank space for the new image while preserving existing ones
+    const placeholderImageUrl = sourceImage; // Use the input image as placeholder
+    
+    // Set processing state and add new variant simultaneously
     setIsProcessing(true);
     setBaseImageForEdit(sourceImage);
     setProcessingStatus({
@@ -176,16 +232,18 @@ export default function AIImageEditor() {
       is_complete: false,
       is_error: false
     });
-    // Add a blank space for the new image while preserving existing ones
-    const placeholderImageUrl = sourceImage; // Use the input image as placeholder
+    
     if (currentView === "output" && generatedVariants.length > 0) {
-      // We're already in output view, add blank image
+      // We're already in output view, add blank image and switch immediately
       setGeneratedVariants(prev => [...prev, placeholderImageUrl]);
-      setCurrentVariant(generatedVariants.length);
+      const newIndex = generatedVariants.length;
+      setCurrentVariant(newIndex);
+      currentVariantRef.current = newIndex;
     } else {
       // First time, create array with original and blank
       setGeneratedVariants([sourceImage, placeholderImageUrl]);
       setCurrentVariant(1);
+      currentVariantRef.current = 1;
       setCurrentView("output");
     }
 
@@ -324,18 +382,24 @@ export default function AIImageEditor() {
           if (pollData.is_complete && !pollData.is_error && pollData.edited_image_url) {
             const base = baseImageForEdit || uploadedImage;
             const newUrl = pollData.edited_image_url;
-            // Replace the blank image with the actual result
-            setGeneratedVariants(prev => {
-              const updated = [...prev];
-              updated[updated.length - 1] = newUrl;
-              return updated;
-            });
-            setCurrentEditUuid(editId); // Track edit UUID for chaining
-            setIsProcessing(false);
-            setEditId(null); // Clear editId to stop polling
-            setUploadedImage(pollData.edited_image_url);
-            setProcessingStatus(null);
-            shouldPollRef.current = false;
+            
+            // Preload the new image before updating UI
+            const img = new Image();
+            img.onload = () => {
+              // Replace the blank image with the actual result after it's loaded
+              setGeneratedVariants(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = newUrl;
+                return updated;
+              });
+              setCurrentEditUuid(editId); // Track edit UUID for chaining
+              setIsProcessing(false);
+              setEditId(null); // Clear editId to stop polling
+              setUploadedImage(pollData.edited_image_url);
+              setProcessingStatus(null);
+              shouldPollRef.current = false;
+            };
+            img.src = newUrl;
           } else if (pollData.is_error || pollData.status === 'failed') {
             setIsProcessing(false);
             setCurrentView("output");
@@ -390,11 +454,15 @@ export default function AIImageEditor() {
   }, [editId]);
 
   const nextVariant = () => {
-    setCurrentVariant((prev) => (prev + 1) % generatedVariants.length)
+    const nextIndex = (currentVariantRef.current + 1) % generatedVariants.length
+    currentVariantRef.current = nextIndex
+    setCurrentVariant(nextIndex)
   }
 
   const prevVariant = () => {
-    setCurrentVariant((prev) => (prev - 1 + generatedVariants.length) % generatedVariants.length)
+    const prevIndex = (currentVariantRef.current - 1 + generatedVariants.length) % generatedVariants.length
+    currentVariantRef.current = prevIndex
+    setCurrentVariant(prevIndex)
   }
 
   const handleDownload = async () => {
@@ -405,10 +473,15 @@ export default function AIImageEditor() {
         // Convert to data URL if it's not already one
         const dataUrl = await ensureDataUrl(imageUrl);
         
+        // Generate improved filename: mizual_(input_image_name)_(position)
+        const baseName = originalFileName || 'image'
+        const position = currentVariant === 0 ? 'original' : `edit_${currentVariant}`
+        const fileName = `mizual_${baseName}_${position}.png`
+        
         // Create download link
         const link = document.createElement("a");
         link.href = dataUrl;
-        link.download = "edited-image.png";
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         
@@ -416,6 +489,11 @@ export default function AIImageEditor() {
         document.body.removeChild(link);
       } catch (error) {
         console.error('Download failed:', error);
+        setDownloadError('Download failed. Please check your internet connection and try again.');
+        // Clear error message after 5 seconds
+        setTimeout(() => {
+          setDownloadError(null);
+        }, 5000);
       }
     }
   }
@@ -433,6 +511,12 @@ export default function AIImageEditor() {
     setIsProcessing(false);
     isSubmittingRef.current = false;
     shouldPollRef.current = false;
+    setContainerDimensions(null);
+    setImageLoading({});
+    setIsDragOver(false);
+    setDownloadError(null);
+    setImageLoadStates({});
+    setOriginalFileName('');
   }
 
   useEffect(() => {
@@ -444,22 +528,35 @@ export default function AIImageEditor() {
   }, [prompt])
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    let lastNavigationTime = 0
+    const navigationThrottle = 100 // Throttle to 100ms for fast navigation
 
-      if (currentView === "output" && document.activeElement?.tagName !== 'TEXTAREA' && generatedVariants.length > 1) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle navigation if we're in output view, not focused on textarea, and have multiple variants
+      if (currentView === "output" && 
+          document.activeElement?.tagName !== 'TEXTAREA' && 
+          generatedVariants.length > 1) { // Allow navigation even during processing
+        
+        const now = Date.now()
+        if (now - lastNavigationTime < navigationThrottle) {
+          return // Skip if we're navigating too fast
+        }
+        
         if (e.key === 'ArrowLeft') {
           e.preventDefault()
+          lastNavigationTime = now
           prevVariant()
         } else if (e.key === 'ArrowRight') {
           e.preventDefault()
+          lastNavigationTime = now
           nextVariant()
         }
       }
     }
 
-    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown, { passive: false })
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [currentView, generatedVariants.length])
+  }, [currentView, generatedVariants.length, isProcessing])
 
   // Auto-focus prompt input when switching to output view after image upload
   useEffect(() => {
@@ -471,6 +568,29 @@ export default function AIImageEditor() {
       return () => clearTimeout(timer)
     }
   }, [currentView])
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    currentVariantRef.current = currentVariant
+  }, [currentVariant])
+
+  // Capture container dimensions after first image is rendered (to match previous behavior)
+  useEffect(() => {
+    if (!containerDimensions && currentView === "output" && generatedVariants.length > 0) {
+      // Small delay to let the image render naturally first
+      const timer = setTimeout(() => {
+        const imageElement = document.querySelector('.main-image-container img') as HTMLImageElement
+        if (imageElement) {
+          const rect = imageElement.getBoundingClientRect()
+          setContainerDimensions({
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          })
+        }
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [containerDimensions, currentView, generatedVariants.length])
 
 
   return (
@@ -494,24 +614,6 @@ export default function AIImageEditor() {
             New Edit
           </Button>
         )}
-        <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              className="text-[#1C1C1E] hover:bg-gray-100 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base"
-            >
-              Contact
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Contact Us</DialogTitle>
-              <DialogDescription>
-                You can reach us at contact@mizual.ai
-              </DialogDescription>
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
       </header>
 
       {/* Main Content */}
@@ -526,21 +628,37 @@ export default function AIImageEditor() {
                 </h1>
               </div>
               <div
-                className="w-full max-w-2xl mx-auto border-2 border-dashed border-[#D1D5DB] rounded-xl sm:rounded-2xl p-6 sm:p-8 lg:p-10 text-center bg-transparent transition-all duration-300 cursor-pointer group hover:border-[#4F46E5]"
+                className={`w-full max-w-2xl mx-auto border-2 border-dashed rounded-xl sm:rounded-2xl p-6 sm:p-8 lg:p-10 text-center bg-transparent transition-all duration-300 cursor-pointer group ${
+                  isDragOver 
+                    ? 'border-[#4F46E5] bg-[#4F46E5]/5 scale-105' 
+                    : 'border-[#D1D5DB] hover:border-[#4F46E5]'
+                }`}
                 onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <div className="flex flex-col items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-[#4F46E5]/10 transition-colors">
-                    <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-[#4F46E5]" />
+                  <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-colors ${
+                    isDragOver 
+                      ? 'bg-[#4F46E5]/10' 
+                      : 'bg-gray-50 group-hover:bg-[#4F46E5]/10'
+                  }`}>
+                    <Upload className={`w-6 h-6 sm:w-8 sm:h-8 transition-all duration-300 ${
+                      isDragOver ? 'text-[#4F46E5] scale-110' : 'text-[#4F46E5]'
+                    }`} />
                   </div>
                   <div>
-                    <p className="text-base sm:text-lg font-medium text-[#1C1C1E] mb-1">
-                      Choose a photo to get started
+                    <p className={`text-base sm:text-lg font-medium mb-1 transition-colors ${
+                      isDragOver ? 'text-[#4F46E5]' : 'text-[#1C1C1E]'
+                    }`}>
+                      {isDragOver ? 'Drop your image here!' : 'Choose a photo to get started'}
                     </p>
-                    <p className="text-xs sm:text-sm text-gray-500">
-                      Or drag and drop your image here
+                    <p className={`text-xs sm:text-sm transition-colors ${
+                      isDragOver ? 'text-[#4F46E5]/70' : 'text-gray-500'
+                    }`}>
+                      {isDragOver ? 'Release to upload' : 'Or drag and drop your image here'}
                     </p>
                   </div>
                 </div>
@@ -567,6 +685,8 @@ export default function AIImageEditor() {
                         setGeneratedVariants([useCase.beforeImage]);
                         setCurrentVariant(0);
                         setCurrentView("output");
+                        // Set filename for examples
+                        setOriginalFileName(useCase.title.replace(/\s+/g, '_').toLowerCase());
                       }}
                       className="px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs sm:text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
                     >
@@ -590,25 +710,90 @@ export default function AIImageEditor() {
                         {useCase.title}
                       </h3>
                       <div className="flex gap-2 sm:gap-3 w-full">
+                        {/* Before Image */}
                         <div className="relative flex-1 aspect-square rounded-lg overflow-hidden shadow-sm border border-[#D1D5DB]">
+                          {/* Loading Skeleton */}
+                          {imageLoadStates[`${index}-before`] !== 'loaded' && (
+                            <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+                              <div className="text-gray-400 text-xs">Loading...</div>
+                            </div>
+                          )}
+                          
+                          {/* Error State */}
+                          {imageLoadStates[`${index}-before`] === 'error' && (
+                            <div className="absolute inset-0 bg-gray-100 flex flex-col items-center justify-center gap-1">
+                              <div className="text-gray-400 text-xs text-center">Failed to load</div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const img = e.currentTarget.parentElement?.querySelector('img')
+                                  if (img) retryImageLoad(`${index}-before`, img, useCase.beforeImage)
+                                }}
+                                className="text-blue-500 text-xs hover:underline"
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          )}
+                          
                           <img
                             src={useCase.beforeImage || "/placeholder.svg"}
                             alt={`${useCase.title} before`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                              imageLoadStates[`${index}-before`] === 'loaded' ? 'opacity-100' : 'opacity-0'
+                            }`}
                             loading="lazy"
+                            onLoadStart={() => handleImageLoadStart(`${index}-before`)}
+                            onLoad={() => handleImageLoad(`${index}-before`)}
+                            onError={() => handleImageError(`${index}-before`)}
                           />
-                          <span className="absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded">
+                          <span className={`absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded transition-opacity ${
+                            imageLoadStates[`${index}-before`] === 'loaded' ? 'opacity-100' : 'opacity-0'
+                          }`}>
                             Before
                           </span>
                         </div>
+                        
+                        {/* After Image */}
                         <div className="relative flex-1 aspect-square rounded-lg overflow-hidden shadow-sm border border-[#D1D5DB]">
+                          {/* Loading Skeleton */}
+                          {imageLoadStates[`${index}-after`] !== 'loaded' && (
+                            <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+                              <div className="text-gray-400 text-xs">Loading...</div>
+                            </div>
+                          )}
+                          
+                          {/* Error State */}
+                          {imageLoadStates[`${index}-after`] === 'error' && (
+                            <div className="absolute inset-0 bg-gray-100 flex flex-col items-center justify-center gap-1">
+                              <div className="text-gray-400 text-xs text-center">Failed to load</div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const img = e.currentTarget.parentElement?.querySelector('img')
+                                  if (img) retryImageLoad(`${index}-after`, img, useCase.afterImage)
+                                }}
+                                className="text-blue-500 text-xs hover:underline"
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          )}
+                          
                           <img
                             src={useCase.afterImage || "/placeholder.svg"}
                             alt={`${useCase.title} after`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                              imageLoadStates[`${index}-after`] === 'loaded' ? 'opacity-100' : 'opacity-0'
+                            }`}
                             loading="lazy"
+                            onLoadStart={() => handleImageLoadStart(`${index}-after`)}
+                            onLoad={() => handleImageLoad(`${index}-after`)}
+                            onError={() => handleImageError(`${index}-after`)}
                           />
-                          <span className="absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded">
+                          <span className={`absolute bottom-1 left-1 text-[10px] sm:text-xs font-medium text-white bg-black/60 px-1 sm:px-1.5 py-0.5 rounded transition-opacity ${
+                            imageLoadStates[`${index}-after`] === 'loaded' ? 'opacity-100' : 'opacity-0'
+                          }`}>
                             After
                           </span>
                         </div>
@@ -624,6 +809,9 @@ export default function AIImageEditor() {
               <div className="max-w-7xl mx-auto">
                 <div className="flex flex-col items-center gap-2">
                   <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-gray-600">
+                    <button className="hover:text-[#4F46E5] transition-colors" onClick={() => setIsContactDialogOpen(true)}>
+                      Contact
+                    </button>
                     <a href="/privacy-policy" target="_blank" className="hover:text-[#4F46E5] transition-colors" onClick={(e) => { e.preventDefault(); setLegalDoc("Privacy Policy"); fetch('/privacy-policy').then(res => res.text()).then(text => setLegalContent(text)); setIsLegalDialogOpen(true); }}>
                       Privacy Policy
                     </a>
@@ -642,6 +830,17 @@ export default function AIImageEditor() {
             </footer>
 
             <input ref={fileInputRef} type="file" accept={SUPPORTED_IMAGE_TYPES} onChange={handleFileUpload} className="hidden" />
+
+            <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Contact Us</DialogTitle>
+                  <DialogDescription>
+                    You can reach us at contact@mizual.ai
+                  </DialogDescription>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
 
             <Dialog open={isLegalDialogOpen} onOpenChange={setIsLegalDialogOpen}>
               <DialogContent className="prose lg:prose-xl p-8">
@@ -693,18 +892,32 @@ export default function AIImageEditor() {
                 </Button>
               )}
 
-              {/* Image Frame - Border wraps around actual image */}
+              {/* Image Frame - Let first image render naturally, then fix dimensions */}
               <div className="flex justify-center w-full max-h-[70vh]">
-                <div className="relative border border-[#D1D5DB] overflow-hidden">
-                  <Image
+                <div 
+                  className={`relative border border-[#D1D5DB] overflow-hidden main-image-container ${
+                    containerDimensions ? 'flex items-center justify-center' : ''
+                  }`}
+                  style={containerDimensions ? {
+                    width: containerDimensions.width,
+                    height: containerDimensions.height,
+                    minWidth: containerDimensions.width,
+                    minHeight: containerDimensions.height
+                  } : {}}
+                >
+                  <NextImage
+                    key={`main-image-${currentVariant}-${generatedVariants[currentVariant]?.slice(-20)}`} // Force re-render on variant change
                     src={generatedVariants[currentVariant] || "/placeholder.svg"}
                     alt="Current image"
                     width={800}
                     height={600}
-                    className="object-contain cursor-pointer hover:scale-[1.02] transition-transform duration-200 max-w-[90vw] max-h-[70vh] w-auto h-auto"
+                    className={`object-contain cursor-pointer hover:scale-[1.02] transition-transform duration-200 ${
+                      containerDimensions ? 'w-full h-full' : 'max-w-[90vw] max-h-[70vh] w-auto h-auto'
+                    }`}
                     onClick={() => setIsFullscreen(true)}
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 800px"
-                    priority={currentVariant === 0}
+                    priority={true} // Always prioritize main image
+                    unoptimized={generatedVariants[currentVariant]?.startsWith('data:') || false} // Handle base64 images
                   />
                   
                   {/* Processing Overlay - Only shows when processing and no error */}
@@ -734,8 +947,8 @@ export default function AIImageEditor() {
                     </div>
                   )}
 
-                  {/* Download Button - only show on successfully processed images */}
-                  {currentVariant > 0 && generatedVariants[currentVariant] !== baseImageForEdit && (
+                  {/* Download Button - show on all edited images except original and currently processing */}
+                  {currentVariant > 0 && !(isProcessing && currentVariant === generatedVariants.length - 1) && (
                     <Button
                       onClick={handleDownload}
                       size="icon"
@@ -744,6 +957,16 @@ export default function AIImageEditor() {
                     >
                       <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                     </Button>
+                  )}
+
+                  {/* Download Error Message */}
+                  {downloadError && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
+                      <div className="bg-red-100 border border-red-200 rounded-lg p-3 max-w-sm shadow-lg">
+                        <p className="text-sm font-medium text-red-800 mb-1">Download Failed</p>
+                        <p className="text-xs text-red-600">{downloadError}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -765,29 +988,35 @@ export default function AIImageEditor() {
             {/* Thumbnail Navigation */}
             <div className="flex-shrink-0 w-full flex justify-center items-center py-3 sm:py-4">
               <div className="flex gap-2 sm:gap-3">
-                {generatedVariants.map((variant, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentVariant(index)}
-                    className={`relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${
-                      index === currentVariant 
-                        ? "border-[#4F46E5] shadow-lg ring-2 ring-[#4F46E5]/20" 
-                        : "border-[#D1D5DB] hover:border-gray-400"
-                    }`}
-                  >
-                    <Image
-                      src={variant}
-                      alt={`Variant ${index + 1}`}
-                      fill
-                      className={`object-cover transition-opacity duration-200 ${
-                        variant === baseImageForEdit && processingStatus && index === generatedVariants.length - 1 
-                          ? "opacity-50" 
-                          : "opacity-100"
+                {generatedVariants.map((variant, index) => {
+                  const isActive = index === currentVariant
+                  const isProcessing = variant === baseImageForEdit && processingStatus && index === generatedVariants.length - 1
+                  return (
+                    <button
+                      key={`${index}-${variant.slice(-10)}`} // More stable key
+                      onClick={() => {
+                        setCurrentVariant(index)
+                        currentVariantRef.current = index
+                      }}
+                      className={`relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg overflow-hidden border-2 transition-border duration-150 hover:scale-105 ${
+                        isActive
+                          ? "border-[#4F46E5] shadow-lg ring-2 ring-[#4F46E5]/20" 
+                          : "border-[#D1D5DB] hover:border-gray-400"
                       }`}
-                      sizes="(max-width: 640px) 60px, (max-width: 768px) 70px, 80px"
-                    />
-                  </button>
-                ))}
+                    >
+                      <NextImage
+                        src={variant}
+                        alt={`Variant ${index + 1}`}
+                        fill
+                        className={`object-cover ${
+                          isProcessing ? "opacity-50" : "opacity-100"
+                        }`}
+                        sizes="(max-width: 640px) 60px, (max-width: 768px) 70px, 80px"
+                        priority={isActive} // Prioritize active thumbnail
+                      />
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -872,7 +1101,7 @@ export default function AIImageEditor() {
                   }
                 } : undefined}
               >
-                <Image
+                <NextImage
                   src={generatedVariants[currentVariant] || "/placeholder.svg"}
                   alt="Generated image variant - Fullscreen"
                   fill
