@@ -34,6 +34,7 @@ export default function AIImageEditor() {
   const [baseImageForEdit, setBaseImageForEdit] = useState<string | null>(null);
   const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const shouldPollRef = useRef(false);
   const [processingStatus, setProcessingStatus] = useState<{
     status: string;
     processing_stage: string;
@@ -106,6 +107,14 @@ export default function AIImageEditor() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
+      // Reset all processing state when uploading new image
+      setEditId(null)
+      setIsProcessing(false)
+      setProcessingStatus(null)
+      setCurrentEditUuid(null)
+      setBaseImageForEdit(null)
+      isSubmittingRef.current = false
+      
       const reader = new FileReader()
       reader.onload = (e) => {
         const imageData = e.target?.result as string
@@ -126,6 +135,14 @@ export default function AIImageEditor() {
     e.preventDefault()
     const file = e.dataTransfer.files[0]
     if (file && file.type.startsWith("image/")) {
+      // Reset all processing state when uploading new image
+      setEditId(null)
+      setIsProcessing(false)
+      setProcessingStatus(null)
+      setCurrentEditUuid(null)
+      setBaseImageForEdit(null)
+      isSubmittingRef.current = false
+      
       const reader = new FileReader()
       reader.onload = (e) => {
         const imageData = e.target?.result as string
@@ -272,7 +289,13 @@ export default function AIImageEditor() {
 
   useEffect(() => {
     if (editId) {
+      shouldPollRef.current = true;
+      let timeoutId: NodeJS.Timeout;
+      
       const poll = async () => {
+        // Check if we should still be polling
+        if (!shouldPollRef.current || !editId) return;
+        
         let apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
         try {
@@ -284,6 +307,9 @@ export default function AIImageEditor() {
           }
 
           const pollData = await pollResponse.json();
+          
+          // Check again if we should still be polling before updating state
+          if (!shouldPollRef.current) return;
 
           // Update processing status
           setProcessingStatus({
@@ -309,10 +335,12 @@ export default function AIImageEditor() {
             setEditId(null); // Clear editId to stop polling
             setUploadedImage(pollData.edited_image_url);
             setProcessingStatus(null);
+            shouldPollRef.current = false;
           } else if (pollData.is_error || pollData.status === 'failed') {
             setIsProcessing(false);
             setCurrentView("output");
             setEditId(null);
+            shouldPollRef.current = false;
             // Keep error status to show error message
             setProcessingStatus({
               status: 'failed',
@@ -333,16 +361,31 @@ export default function AIImageEditor() {
               setProcessingStatus(null);
             }, 5000);
           } else {
-            setTimeout(poll, 2000); // Reduced polling frequency to 2 seconds
+            // Only continue polling if we should still be polling
+            if (shouldPollRef.current) {
+              timeoutId = setTimeout(poll, 2000); // Reduced polling frequency to 2 seconds
+            }
           }
         } catch (error) {
           console.error('Polling error:', error);
           setIsProcessing(false);
           setProcessingStatus(null);
           setEditId(null);
+          shouldPollRef.current = false;
         }
       };
+      
       poll();
+      
+      // Cleanup timeout when effect is cleaned up
+      return () => {
+        shouldPollRef.current = false;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+    } else {
+      shouldPollRef.current = false;
     }
   }, [editId]);
 
@@ -386,6 +429,10 @@ export default function AIImageEditor() {
     setEditId(null);
     setProcessingStatus(null);
     setCurrentEditUuid(null);
+    setBaseImageForEdit(null);
+    setIsProcessing(false);
+    isSubmittingRef.current = false;
+    shouldPollRef.current = false;
   }
 
   useEffect(() => {
@@ -413,6 +460,17 @@ export default function AIImageEditor() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [currentView, generatedVariants.length])
+
+  // Auto-focus prompt input when switching to output view after image upload
+  useEffect(() => {
+    if (currentView === "output" && textareaRef.current) {
+      // Small delay to ensure the component is rendered
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [currentView])
 
 
   return (
@@ -496,13 +554,19 @@ export default function AIImageEditor() {
                     <button
                       key={index}
                       onClick={() => {
+                        // Reset all processing state when loading example
+                        setEditId(null)
+                        setIsProcessing(false)
+                        setProcessingStatus(null)
+                        setCurrentEditUuid(null)
+                        setBaseImageForEdit(null)
+                        isSubmittingRef.current = false
+                        
                         setUploadedImage(useCase.beforeImage);
                         setPrompt(useCase.prompt);
-
                         setGeneratedVariants([useCase.beforeImage]);
                         setCurrentVariant(0);
                         setCurrentView("output");
-
                       }}
                       className="px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs sm:text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm"
                     >
@@ -643,8 +707,8 @@ export default function AIImageEditor() {
                     priority={currentVariant === 0}
                   />
                   
-                  {/* Processing Overlay - Only shows when processing */}
-                  {generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 && (
+                  {/* Processing Overlay - Only shows when processing and no error */}
+                  {generatedVariants[currentVariant] === baseImageForEdit && processingStatus && currentVariant === generatedVariants.length - 1 && !processingStatus.is_error && processingStatus.processing_stage !== 'failed' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-white/80">
                       <p className="text-lg font-medium text-[#1C1C1E]">{processingStatus.message}</p>
                       {processingStatus.progress_percent > 0 && (
@@ -662,16 +726,16 @@ export default function AIImageEditor() {
                   
                   {/* Error Overlay - Only shows when there's an error */}
                   {processingStatus && (processingStatus.is_error || processingStatus.processing_stage === 'failed') && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center bg-red-50/90">
-                      <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
+                      <div className="bg-red-100 border border-red-200 rounded-lg p-4 max-w-md shadow-lg">
                         <p className="text-lg font-medium text-red-800 mb-2">Edit Failed</p>
                         <p className="text-sm text-red-600">{processingStatus.message}</p>
                       </div>
                     </div>
                   )}
 
-                  {/* Download Button - only show on generated/edited images (not the first/original image) */}
-                  {currentVariant > 0 && (
+                  {/* Download Button - only show on successfully processed images */}
+                  {currentVariant > 0 && generatedVariants[currentVariant] !== baseImageForEdit && (
                     <Button
                       onClick={handleDownload}
                       size="icon"
