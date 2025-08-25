@@ -62,8 +62,9 @@ Mizual Frontend is a modern, responsive web application built with Next.js that 
 - **AI-Powered Image Editing**: Natural language prompts for image modifications
 - **Real-time Progress Tracking**: Live status updates during processing
 - **Edit Chaining**: Ability to perform multiple sequential edits on the same image
+- **Prompt History Navigation**: Contextual prompt display showing the modification used to create each subsequent image
 - **Cross-Platform Responsive Design**: Optimized for mobile, tablet, and desktop across all browsers
-- **Image Gallery Navigation**: Keyboard and touch navigation between edit variants
+- **Image Gallery Navigation**: Keyboard and touch navigation between edit variants with prompt synchronization
 - **Multi-Format Support**: JPEG, PNG, WebP, GIF, AVIF image formats
 - **Download Functionality**: Direct image download with format preservation
 - **Performance Optimized**: Lazy loading, efficient rendering, optimized bundle size
@@ -152,6 +153,7 @@ const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null
 
 // UI State
 const [prompt, setPrompt] = useState("")
+const [promptHistory, setPromptHistory] = useState<string[]>([]) // Stores prompts for navigation context
 const [isFullscreen, setIsFullscreen] = useState(false)
 const [currentEditUuid, setCurrentEditUuid] = useState<string | null>(null)
 ```
@@ -420,6 +422,154 @@ Labels: text-xs to text-sm
 - Exponential backoff visualization
 - User-friendly waiting messages
 ```
+
+#### Recent UX Improvements (August 24, 2025)
+
+**Auto-Focus Enhancement**:
+- Prompt input automatically focuses when user uploads an image
+- 100ms delay ensures component is rendered before focusing
+- Enables immediate typing after image upload without manual click
+
+**Error Display Optimization**:
+- Error messages now show only as red error boxes (no full-image overlay)
+- Removed duplicate black error messages behind red error boxes
+- Processing overlay excludes error states to prevent visual conflicts
+- Maintains image visibility while showing clear error feedback
+
+**Session Management**:
+- Independent editing sessions for new image uploads
+- Complete processing state reset when uploading new images or returning home
+- Prevents stuck processing states from affecting new edits
+- Robust polling cleanup with `shouldPollRef` to prevent stale API updates
+
+**Download Button Logic**:
+- Download button appears only after successful image processing
+- Hidden during processing state to prevent premature downloads
+- Condition: `currentVariant > 0 && generatedVariants[currentVariant] !== baseImageForEdit`
+- Ensures users can only download completed, successful edits
+
+**Implementation Details**:
+```typescript
+// Auto-focus implementation
+useEffect(() => {
+  if (currentView === "output" && textareaRef.current) {
+    const timer = setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 100)
+    return () => clearTimeout(timer)
+  }
+}, [currentView])
+
+// Processing state reset pattern
+const resetProcessingState = () => {
+  setEditId(null)
+  setIsProcessing(false)
+  setProcessingStatus(null)
+  setCurrentEditUuid(null)
+  setBaseImageForEdit(null)
+  isSubmittingRef.current = false
+  shouldPollRef.current = false
+}
+
+// Error overlay exclusion
+{generatedVariants[currentVariant] === baseImageForEdit && 
+ processingStatus && 
+ currentVariant === generatedVariants.length - 1 && 
+ !processingStatus.is_error && 
+ processingStatus.processing_stage !== 'failed' && (
+  <ProcessingOverlay />
+)}
+```
+
+#### Latest Improvements (August 25, 2025 - Session 3)
+
+**Prompt History Navigation System**:
+- **Contextual Prompt Display**: When navigating between edited images, the prompt input now shows the prompt that was used to create the next image in the editing sequence
+- **Navigation Logic**: Original image shows first edit prompt, first edit shows second edit prompt, and so on - providing context for what modification created each subsequent image
+- **Cross-Navigation Support**: Prompt synchronization works across all navigation methods (arrow keys, thumbnail clicks, and touch navigation)
+- **Smart State Management**: Prompt history is stored per editing session and automatically reset when uploading new images or returning home
+- **Empty State Handling**: Final image in sequence shows empty prompt (ready for new edit), maintaining clean UX flow
+
+**Implementation Details**:
+```typescript
+// Prompt history storage - stores prompt at source image index
+const [promptHistory, setPromptHistory] = useState<string[]>([])
+
+// During prompt submission, store prompt at current image index
+setPromptHistory(prev => {
+  const updated = [...prev];
+  updated[currentVariant] = currentPrompt; // Store at source image
+  return updated;
+});
+
+// Navigation shows prompt from current index (creates next image)
+const promptToShow = promptHistory[currentIndex] || ""
+setPrompt(promptToShow)
+```
+
+**User Experience Flow**:
+- Upload image → prompt history starts empty
+- Submit "make grass white" → prompt stored at index 0, clears after success
+- Navigate to original → shows "make grass white" (creates edit 1)
+- Navigate to edit 1 → shows empty (ready for next edit)
+- Submit "make grass yellow" from edit 1 → prompt stored at index 1, clears after success
+- Navigate back to edit 1 → shows "make grass yellow" (creates edit 2)
+- Navigate to edit 2 → shows empty (ready for next edit)
+
+#### Latest Improvements (August 24, 2025 - Session 2)
+
+**Fast Keyboard Navigation Optimization**:
+- Fixed main image not switching during rapid left/right arrow navigation
+- Added `currentVariantRef` for immediate state updates without React render delays
+- Implemented 100ms throttling to prevent excessive rapid navigation
+- Enhanced main image re-rendering with stable keys and priority loading
+- Removed processing state blocking from keyboard navigation (allows viewing previous images during processing)
+
+**Processing Transition Improvements**:  
+- Eliminated white background flash when submitting prompts on multiple images
+- Reordered state updates for seamless transitions from source image to processing overlay
+- Improved visual flow without jarring placeholder transitions
+
+**Fixed Container Dimensions**:
+- First uploaded image renders naturally with original responsive behavior
+- Container dimensions are captured after natural rendering (100ms delay)
+- Subsequent edited images maintain fixed container size to prevent layout shifts
+- Uses `getBoundingClientRect()` to capture actual displayed dimensions
+- Resets dimensions when starting new editing sessions
+
+**Download System Enhancements**:
+- **Improved Download Button Logic**: Shows on all edited images (not just final), hidden only during active processing
+- **Smart Download Filenames**: Format `mizual_(input_image_name)_(position).png`
+  - Examples: `mizual_vacation_edit_1.png`, `mizual_face_retouching_edit_2.png`
+  - Handles both user uploads and example case images
+  - Stores original filename without extension for reuse across editing session
+- **Download Error Handling**: User-friendly error overlay with retry message, no page redirects
+
+**Drag & Drop Visual Feedback**:
+- Real-time visual highlighting when dragging files over drop zone
+- Blue border, background tint, and scale animation during drag
+- Dynamic text changes: "Drop your image here!" / "Release to upload"
+- Smart drag leave detection to prevent flickering
+- Smooth transitions with consistent blue theme
+
+**Example Images Loading System**:
+- **Loading States**: Animated skeleton placeholders prevent broken image appearance
+- **Error Handling**: "Failed to load" messages with retry buttons for network issues
+- **Progressive Loading**: Images fade in smoothly once loaded, labels appear with images
+- **Retry Mechanism**: Cache-busting retry system for temporary network failures
+- **Network Optimization**: Graceful fallbacks for slow internet connections
+
+**UI/UX Polish**:
+- Moved Contact button from header to footer for cleaner interface
+- Maintained all dialog functionality with consistent footer styling
+- Fixed Image component naming conflicts (NextImage vs native Image constructor)
+- Enhanced error states across all image loading scenarios
+
+**Code Quality Improvements**:
+- Comprehensive state management for image loading, drag states, and error handling
+- Robust cleanup patterns for all new state variables
+- Improved component re-rendering performance with stable keys and refs
+- Better separation of concerns between UI state and processing state
 
 ### Accessibility Features
 

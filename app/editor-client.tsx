@@ -54,6 +54,7 @@ export default function AIImageEditor() {
   const [isLegalDialogOpen, setIsLegalDialogOpen] = useState(false);
   const [legalContent, setLegalContent] = useState("");
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [promptHistory, setPromptHistory] = useState<string[]>([]); // Store prompts for each variant
 
   
   // Supported image formats from environment or default
@@ -149,6 +150,7 @@ export default function AIImageEditor() {
         const imageData = e.target?.result as string
         setUploadedImage(imageData)
         setGeneratedVariants([imageData])
+        setPromptHistory([]) // Reset prompt history for new image
         setCurrentVariant(0)
         setCurrentView("output")
       }
@@ -200,6 +202,7 @@ export default function AIImageEditor() {
         const imageData = e.target?.result as string
         setUploadedImage(imageData)
         setGeneratedVariants([imageData])
+        setPromptHistory([]) // Reset prompt history for new image
         setCurrentVariant(0)
         setCurrentView("output")
       }
@@ -217,6 +220,8 @@ export default function AIImageEditor() {
 
     if (!prompt.trim() || !sourceImage) return;
 
+    // Store the current prompt for this new variant
+    const currentPrompt = prompt.trim();
     
     // Add a blank space for the new image while preserving existing ones
     const placeholderImageUrl = sourceImage; // Use the input image as placeholder
@@ -236,12 +241,20 @@ export default function AIImageEditor() {
     if (currentView === "output" && generatedVariants.length > 0) {
       // We're already in output view, add blank image and switch immediately
       setGeneratedVariants(prev => [...prev, placeholderImageUrl]);
+      // Store the prompt at the index of the SOURCE image that will create the new image
+      setPromptHistory(prev => {
+        const updated = [...prev];
+        updated[currentVariant] = currentPrompt; // Store prompt at current image index
+        return updated;
+      });
       const newIndex = generatedVariants.length;
       setCurrentVariant(newIndex);
       currentVariantRef.current = newIndex;
     } else {
       // First time, create array with original and blank
       setGeneratedVariants([sourceImage, placeholderImageUrl]);
+      // Store the prompt at index 0 (original image) since it will create the first edit
+      setPromptHistory([currentPrompt]);
       setCurrentVariant(1);
       currentVariantRef.current = 1;
       setCurrentView("output");
@@ -397,6 +410,8 @@ export default function AIImageEditor() {
               setEditId(null); // Clear editId to stop polling
               setUploadedImage(pollData.edited_image_url);
               setProcessingStatus(null);
+              // Clear prompt after successful processing
+              setPrompt("");
               shouldPollRef.current = false;
             };
             img.src = newUrl;
@@ -457,12 +472,18 @@ export default function AIImageEditor() {
     const nextIndex = (currentVariantRef.current + 1) % generatedVariants.length
     currentVariantRef.current = nextIndex
     setCurrentVariant(nextIndex)
+    // Show the prompt stored at this image's index (the prompt that creates the next image)
+    const promptToShow = promptHistory[nextIndex] || ""
+    setPrompt(promptToShow)
   }
 
   const prevVariant = () => {
     const prevIndex = (currentVariantRef.current - 1 + generatedVariants.length) % generatedVariants.length
     currentVariantRef.current = prevIndex
     setCurrentVariant(prevIndex)
+    // Show the prompt stored at this image's index (the prompt that creates the next image)
+    const promptToShow = promptHistory[prevIndex] || ""
+    setPrompt(promptToShow)
   }
 
   const handleDownload = async () => {
@@ -504,6 +525,7 @@ export default function AIImageEditor() {
     setPrompt("")
     setCurrentVariant(0)
     setGeneratedVariants([]);
+    setPromptHistory([]); // Reset prompt history
     setEditId(null);
     setProcessingStatus(null);
     setCurrentEditUuid(null);
@@ -997,6 +1019,9 @@ export default function AIImageEditor() {
                       onClick={() => {
                         setCurrentVariant(index)
                         currentVariantRef.current = index
+                        // Show the prompt stored at this image's index (the prompt that creates the next image)
+                        const promptToShow = promptHistory[index] || ""
+                        setPrompt(promptToShow)
                       }}
                       className={`relative w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg overflow-hidden border-2 transition-border duration-150 hover:scale-105 ${
                         isActive
